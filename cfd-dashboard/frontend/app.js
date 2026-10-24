@@ -39,6 +39,10 @@ const PARAM_LABELS = {
 };
 function fmtParam(key, value) {
   const spec = PARAM_LABELS[key];
+  if (value && typeof value === "object") {
+    const text = Object.entries(value).map(([k, v]) => `${k}: ${typeof v === "number" ? fmt(v, 2) : v}`).join(", ");
+    return { label: spec ? spec[0] : key, text: spec?.[2] ? `${text} ${spec[2]}` : text };
+  }
   if (!spec) return { label: key, text: typeof value === "number" ? fmt(value, 3) : String(value) };
   return { label: spec[0], text: `${typeof value === "number" ? fmt(value, spec[1]) : value}${spec[2] ? " " + spec[2] : ""}` };
 }
@@ -416,6 +420,10 @@ async function refreshModal(loadGeometry) {
       (det.role ? `<div class="metric"><div class="label">Role</div><div class="value">${esc(det.role.replaceAll("_", " "))}</div></div>` : "") +
       `</div>` +
       ((det.violations || []).length ? `<div class="campaign-error">${det.violations.map((v) => esc(`${v.constraint || ""}:${v.component || ""} ${v.value}>${v.limit}`)).join("; ")}</div>` : "") +
+      `<div class="rom-downloads">` +
+      (run.has_geometry ? `<a class="cad-download" href="/api/runs/${encodeURIComponent(run.id)}/geometry" download="${esc(run.id)}.stl">Download CAD (.stl)</a>` : "") +
+      ((det.files || []).includes("design.step") ? `<a class="cad-download" href="/api/runs/${encodeURIComponent(run.id)}/files/design.step" download="${esc(run.id)}.step">Download CAD (.step)</a>` : "") +
+      `</div>` +
       `<div class="rom-files">` +
       (det.files || []).map((n) => `<a href="/api/runs/${encodeURIComponent(run.id)}/files/${n}">${esc(n)}</a>`).join(" ") +
       `</div>`;

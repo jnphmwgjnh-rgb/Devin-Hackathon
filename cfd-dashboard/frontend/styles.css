@@ -161,3 +161,7 @@ main { padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 16px
 .card-pareto{position:relative}
 .campaign-steps li{opacity:.4}.campaign-steps li.current{opacity:1;font-weight:600}
 .campaign-devin a{color:inherit}
+
+.campaign-bar.hidden,.campaign-overlay.hidden{display:none}
+.cad-download{display:inline-flex;align-items:center;gap:6px;margin:10px 8px 0 0;padding:8px 14px;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;text-decoration:none}
+.cad-download:hover{background:#1d4ed8}

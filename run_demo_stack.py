@@ -10,7 +10,8 @@ env = {**os.environ, "DEMO": os.environ.get("DEMO", "true")}
 procs = [
     subprocess.Popen([str(PY), "-m", "app", "--runs-dir",
                       str(ROOT / "cfd-dashboard" / "runs_modelling"),
-                      "--poll-interval", "0.25", "--port", "8000"],
+                      "--poll-interval", "0.25", "--port", "8000",
+                      "--budget", "48"],
                      cwd=ROOT / "cfd-dashboard" / "backend", env=env),
     subprocess.Popen([str(PY), "app.py"], cwd=ROOT / "stage1_intake", env=env),
 ]
