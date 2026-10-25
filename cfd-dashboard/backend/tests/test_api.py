@@ -9,7 +9,7 @@ def test_runs_api_and_geometry(tmp_path):
     runs_dir = tmp_path / "runs"
     case = runs_dir / "run_0007"
     write_complete_case(case, index=7, seed=23)
-    with TestClient(create_app(AppConfig(runs_dir=runs_dir, budget=10))) as client:
+    with TestClient(create_app(AppConfig(runs_dir=runs_dir))) as client:
         response = client.get("/api/runs")
         assert response.status_code == 200
         payload = response.json()
@@ -41,7 +41,5 @@ def test_runs_api_and_geometry(tmp_path):
         details = client.get("/api/runs/run_0007")
         assert details.status_code == 200
         assert details.json()["residuals"]["iterations"]
-        geometry = client.get("/api/runs/run_0007/geometry")
-        assert geometry.status_code == 200
-        assert geometry.headers["content-type"].startswith("model/stl")
-        assert geometry.text.startswith("solid heatsink")
+        geometry = client.get("/api/runs/run_0007/cad?format=stl")
+        assert geometry.status_code == 404

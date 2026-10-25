@@ -112,9 +112,12 @@ def _apply_normalization(
     extraction: RequirementsExtraction,
     document: str,
     reference_files: Mapping[str, bytes],
+    *,
+    verify_evidence: bool = True,
 ) -> NormalizationResult:
     norm = normalize_extraction(
-        extraction, document=document, reference_files=reference_files
+        extraction, document=document, reference_files=reference_files,
+        verify_evidence=verify_evidence,
     )
     result.spec = norm.spec
     result.missing_essential = norm.missing_essential
@@ -192,7 +195,10 @@ def parse_requirements(
             result.final_validation_errors = errors
             result.error = "manual extraction failed schema validation"
             return result
-        norm = _apply_normalization(result, extraction_obj, document, reference_files)
+        norm = _apply_normalization(
+            result, extraction_obj, document, reference_files,
+            verify_evidence=False,
+        )
         result.final_validation_errors = norm.blocking_errors
         if result.status == "failed":
             result.error = "; ".join(norm.blocking_errors[:5])

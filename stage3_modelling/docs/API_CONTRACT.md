@@ -48,6 +48,43 @@ Errors use `{"error": {"code": "...", "message": "...", "details": {...}}}` with
 appropriate HTTP status. CORS allows the origins in `COLDPLATE_CORS_ORIGINS`
 (comma-separated; default: localhost on any port).
 
+## Dashboard intake and campaign API
+
+The single-process dashboard server also exposes the intake and candidate
+campaign API. Intake sessions are in-memory and keyed by `intake_id` (UUID);
+they contain the extraction, source document, provider, assessment, and answer
+history. They are not durable across a server restart.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/intake/capabilities` | Reports built-in parser availability and its reason |
+| GET | `/api/intake/prompt` | Returns the external-AI extraction prompt |
+| POST | `/api/intake/external` | Validates a pasted JSON reply, then assesses requirements |
+| POST | `/api/intake/builtin` | Parses one text document with the Devin parser when configured |
+| POST | `/api/intake/{intake_id}/answers` | Applies all follow-up answers and reassesses |
+| POST | `/api/modelling/start` | Starts a campaign for a complete intake session |
+| GET | `/api/modelling/status` | Reports campaign stage, generation, evaluation counts, Pareto IDs, CAD progress, and ETA |
+| GET | `/api/runs/{candidate_id}/cad?format=step\|stl\|glb` | Downloads the candidate's CAD, if it exists |
+
+`POST /api/intake/external` accepts `{"json_text":"...","source_name":"optional.pdf"}`.
+Its successful response contains `intake_id`, `status`, `questions`, `summary`,
+`warnings`, and `assumptions`; invalid JSON or schema data returns `422` with
+field-specific `errors`. The external-AI path makes no server-side LLM call.
+`POST /api/intake/builtin` accepts `{"text":"..."}` and returns `409` with an
+explanation when `DEVIN_API_KEY` is absent. Follow-up answers are
+`{"answers":{"coolant.flow_rate":{"value":2,"unit":"L/min"}}}`.
+
+The dashboard `run_id` and on-disk run folder are the optimizer `candidate_id`
+(for example, `c014` and `runs_modelling/c014`). Each record carries a
+`design_id` of `{job_id}-{candidate_id}`. CAD is stored in that candidate
+folder as `{design_id}.step`, `{design_id}.stl`, and `{design_id}.glb`.
+Successful downloads use `Content-Disposition` filenames equal to the
+design-ID filename; a candidate without exported CAD returns `404`.
+CAD is exported for Pareto designs only. Campaign counts use the planned upper
+bound `pop_size * n_gen + 1` (including the baseline), while the final status
+reports the actual number of unique evaluated candidates. ETA is based on the
+measured mean evaluation duration and remaining planned evaluations.
+
 ### POST /api/optimize
 
 JSON body, or `multipart/form-data` with fields `requirements` (the .md file),

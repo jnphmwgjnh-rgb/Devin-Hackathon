@@ -253,7 +253,6 @@ def parse_case(case_dir: Path, cfg) -> Run:
         except (OSError, json.JSONDecodeError):
             mr = None
         if isinstance(mr, dict):
-            geom = case_dir / "constant" / "triSurface"
             met = mr.get("metrics") or {}
             return Run(
                 id=run_id, index=index, status=mr.get("status", "completed"),
@@ -263,7 +262,7 @@ def parse_case(case_dir: Path, cfg) -> Run:
                 started_at=mr.get("started_at"), finished_at=mr.get("finished_at"),
                 runtime_s=None, converged=None, on_pareto=False,
                 error=mr.get("error"),
-                has_geometry=geom.is_dir() and any(geom.glob("*.stl")),
+                has_geometry=any(case_dir.glob("*.stl")),
                 residuals={"iterations": [], "fields": {}},
                 details={
                     "label": mr.get("label"), "source": mr.get("source"),
@@ -273,8 +272,10 @@ def parse_case(case_dir: Path, cfg) -> Run:
                     "hbm_hottest": met.get("hbm_hottest"), "gpu_hottest": met.get("gpu_hottest"),
                     "coolant_rise_k": met.get("coolant_rise_k"),
                     "candidate_id": mr.get("candidate_id"), "design_id": mr.get("design_id"),
-                    "files": [n for n in ("design.step", "preview.glb", "model_result.json")
-                              if (case_dir / n).exists()],
+                    "files": [p.name for p in case_dir.glob("*")
+                              if p.is_file() and p.suffix in {".step", ".stl", ".glb"}]
+                             + (["model_result.json"] if mr_path.exists() else []),
+                    "cad_error": mr.get("cad_error"),
                 },
             )
     params = {}
@@ -362,7 +363,9 @@ def parse_case(case_dir: Path, cfg) -> Run:
         else None
     )
     geometry = case_dir / "constant" / "triSurface"
-    has_geometry = geometry.is_dir() and any(geometry.glob("*.stl"))
+    has_geometry = (
+        geometry.is_dir() and any(geometry.glob("*.stl"))
+    ) or any(case_dir.glob("*.stl"))
 
     runtime_s = None
     if started_at:

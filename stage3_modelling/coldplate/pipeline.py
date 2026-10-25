@@ -6,7 +6,9 @@ import csv
 import hashlib
 import io
 import json
+import multiprocessing
 import time
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -16,7 +18,8 @@ from coldplate.cad import export_design
 from coldplate.evaluate import SIMULATION_METADATA, evaluate
 from coldplate.geometry import build_layout
 from coldplate.optimize import (
-    requirement_conflicts, run_optimization, select_designs, sweep_design,
+    default_worker_count, requirement_conflicts, run_optimization,
+    select_designs, sweep_design,
 )
 from coldplate.parser import parse_requirements
 
@@ -84,6 +87,7 @@ def run_job(
     progress: Optional[Callable] = None,
     on_interpretation: Optional[Callable] = None,
     on_candidate: Optional[Callable] = None,
+    on_generation: Optional[Callable] = None,
     on_selected: Optional[Callable] = None,
     on_cad: Optional[Callable] = None,
 ) -> dict:
@@ -250,8 +254,10 @@ def run_job(
         inputs, pop_size=opts["pop_size"], n_gen=opts["n_gen"], seed=opts["seed"],
         grid_mm=opts["grid_mm"], progress=ev_progress,
         workers=opts.get("workers"), on_candidate=on_candidate,
+        on_generation=on_generation,
     )
     optimization_seconds = time.perf_counter() - optimization_started
+    emit("pareto", 0.7, f"Pareto front contains {opt.n_nondominated} designs")
     emit("select", 0.7, "selecting designs")
     selected = select_designs(opt)
     if on_selected:
@@ -327,54 +333,95 @@ def run_job(
     }
     cad_candidates.update({candidate.candidate_id: candidate for candidate in selected})
     cad_export_started = time.perf_counter()
-    for cid, candidate in sorted(
+    ordered_cad_candidates = sorted(
         cad_candidates.items(), key=lambda item: int(item[0][1:])
-    ):
-        did = f"{job_id}-{cid}"
-        rec = next(row for row in cand_rows if row["candidate_id"] == cid)
-        if not opts["export_cad"]:
-            continue
-        emit("export", 0.7, f"exporting CAD {did}")
-        try:
-            art = export_design(
-                candidate.nominal_eval.layout,
-                str(job_dir / "designs" / did),
-                name=did,
-            )
-            file_refs = {}
-            for role, path, manifest_role in (
-                ("step", Path(art.step_path), "cad_step"),
-                ("stl", Path(art.stl_path), "cad_stl"),
-                ("glb", Path(art.glb_path), "cad_glb"),
-            ):
-                rel = f"designs/{did}/{path.name}"
-                entry = bundle.write(
-                    rel, path.read_bytes(), role=manifest_role, design_id=did
-                )
-                file_refs[role] = {
-                    "url": f"/api/results/{job_id}/files/{rel}",
-                    "path": entry["path"],
-                    "bytes": entry["bytes"],
-                    "sha256": entry["sha256"],
+    )
+    if opts["export_cad"]:
+        emit("cad_export", 0.72, f"CAD export 0/{len(ordered_cad_candidates)}")
+        worker_count = opts.get("workers")
+        if worker_count is None:
+            worker_count = default_worker_count()
+        export_results = []
+        if worker_count > 1:
+            with ProcessPoolExecutor(
+                max_workers=worker_count,
+                mp_context=multiprocessing.get_context("spawn"),
+            ) as executor:
+                futures = {}
+                for cid, candidate in ordered_cad_candidates:
+                    did = f"{job_id}-{cid}"
+                    futures[cid] = executor.submit(
+                        export_design,
+                        candidate.nominal_eval.layout,
+                        str(job_dir / "designs" / did),
+                        name=did,
+                    )
+                for cid, future in futures.items():
+                    try:
+                        export_results.append((cid, future.result()))
+                    except Exception as exc:
+                        export_results.append((cid, exc))
+        else:
+            for cid, candidate in ordered_cad_candidates:
+                did = f"{job_id}-{cid}"
+                try:
+                    artifact = export_design(
+                        candidate.nominal_eval.layout,
+                        str(job_dir / "designs" / did),
+                        name=did,
+                    )
+                except Exception as exc:
+                    artifact = exc
+                export_results.append((cid, artifact))
+
+        for export_index, (cid, artifact) in enumerate(export_results, start=1):
+            did = f"{job_id}-{cid}"
+            rec = next(row for row in cand_rows if row["candidate_id"] == cid)
+            try:
+                if isinstance(artifact, Exception):
+                    raise artifact
+                art = artifact
+                file_refs = {}
+                for role, path, manifest_role in (
+                    ("step", Path(art.step_path), "cad_step"),
+                    ("stl", Path(art.stl_path), "cad_stl"),
+                    ("glb", Path(art.glb_path), "cad_glb"),
+                ):
+                    rel = f"designs/{did}/{path.name}"
+                    entry = bundle.write(
+                        rel, path.read_bytes(), role=manifest_role, design_id=did
+                    )
+                    file_refs[role] = {
+                        "url": f"/api/results/{job_id}/files/{rel}",
+                        "path": entry["path"],
+                        "bytes": entry["bytes"],
+                        "sha256": entry["sha256"],
+                    }
+                file_refs["glb"]["convention"] = art.glb_convention
+                cad_files_by_candidate[cid] = file_refs
+                cad_check_by_candidate[cid] = {
+                    "bbox_mm": list(art.bbox_mm), "volume_mm3": art.volume_mm3,
+                    "model_volume_mm3": art.model_volume_mm3,
+                    "volume_rel_err": abs(art.volume_mm3 - art.model_volume_mm3)
+                    / art.model_volume_mm3,
+                    "fin_count": art.fin_count, "valid": art.is_valid,
                 }
-            file_refs["glb"]["convention"] = art.glb_convention
-            cad_files_by_candidate[cid] = file_refs
-            cad_check_by_candidate[cid] = {
-                "bbox_mm": list(art.bbox_mm), "volume_mm3": art.volume_mm3,
-                "model_volume_mm3": art.model_volume_mm3,
-                "volume_rel_err": abs(art.volume_mm3 - art.model_volume_mm3)
-                / art.model_volume_mm3,
-                "fin_count": art.fin_count, "valid": art.is_valid,
-            }
-            rec["files"] = file_refs
-            if on_cad:
-                on_cad(did, {
-                    "step": Path(art.step_path).read_bytes(),
-                    "stl": Path(art.stl_path).read_bytes(),
-                    "glb": Path(art.glb_path).read_bytes(),
-                })
-        except Exception as exc:
-            rec["cad_error"] = str(exc)
+                rec["files"] = file_refs
+                if on_cad:
+                    on_cad(cid, did, {
+                        "step": Path(art.step_path).read_bytes(),
+                        "stl": Path(art.stl_path).read_bytes(),
+                        "glb": Path(art.glb_path).read_bytes(),
+                    }, None)
+            except Exception as exc:
+                rec["cad_error"] = str(exc)
+                if on_cad:
+                    on_cad(cid, did, None, str(exc))
+            emit(
+                "cad_export",
+                0.72 + 0.27 * export_index / max(len(ordered_cad_candidates), 1),
+                f"CAD export {export_index}/{len(ordered_cad_candidates)}",
+            )
     cad_export_seconds = time.perf_counter() - cad_export_started
 
     sel_docs = []

@@ -25,6 +25,11 @@ def create_app(cfg: AppConfig) -> FastAPI:
     app = FastAPI(title="CFD Optimization Dashboard", lifespan=lifespan)
     app.state.store = store
     app.state.watcher = watcher
+    app.state.intake_sessions = {}
+
+    from app.intake import router as intake_router
+
+    app.include_router(intake_router)
 
     @app.get("/api/runs")
     def list_runs():
@@ -47,36 +52,45 @@ def create_app(cfg: AppConfig) -> FastAPI:
             }
         return {**run.to_dict(), "residuals": {"iterations": iterations, "fields": fields}}
 
-    @app.get("/api/runs/{run_id}/geometry")
-    def get_geometry(run_id: str):
-        if store.get_run(run_id) is None:
+    @app.get("/api/runs/{run_id}/cad")
+    def get_cad(run_id: str, format: str = "stl"):
+        if format not in {"step", "stl", "glb"}:
+            raise HTTPException(status_code=400, detail="format must be step, stl, or glb")
+        store.scan()
+        run = store.get_run(run_id)
+        if run is None:
             raise HTTPException(status_code=404, detail="Run not found")
-        case_dir = cfg.runs_dir / run_id
-        geometry_dir = case_dir / "constant" / "triSurface"
-        files = sorted(geometry_dir.glob("*.stl")) if geometry_dir.is_dir() else []
-        if not files:
-            raise HTTPException(status_code=404, detail="Geometry not found")
-        return FileResponse(files[0], media_type="model/stl", filename=files[0].name)
+        design_id = (run.details or {}).get("design_id")
+        if not design_id:
+            raise HTTPException(status_code=404, detail="CAD not found for this run")
+        path = cfg.runs_dir / run_id / f"{design_id}.{format}"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="CAD not found for this run")
+        media_type = {
+            "step": "application/step",
+            "stl": "model/stl",
+            "glb": "model/gltf-binary",
+        }[format]
+        return FileResponse(path, media_type=media_type, filename=f"{design_id}.{format}")
 
     from app import modelling
 
     @app.post("/api/modelling/start")
     def modelling_start(body: dict = None):
-        return modelling.start(body or {}, cfg.runs_dir)
+        body = body or {}
+        intake_id = body.get("intake_id")
+        session = app.state.intake_sessions.get(intake_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Intake not found")
+        if session["assessment"]["status"] != "ok" or session["assessment"]["questions"]:
+            raise HTTPException(status_code=409, detail="Intake still needs required answers")
+        return modelling.start_intake(
+            intake_id, session, cfg.runs_dir, app.state.intake_sessions
+        )
 
     @app.get("/api/modelling/status")
     def modelling_status():
         return modelling.status()
-
-    @app.get("/api/runs/{run_id}/files/{name}")
-    def run_file(run_id: str, name: str):
-        from fastapi.responses import FileResponse
-        if name not in modelling._ALLOWED_FILES:
-            return {"error": {"code": "not_allowed", "message": name}}
-        p = cfg.runs_dir / run_id / name
-        if not p.is_file() or ".." in run_id or "/" in run_id or "\\" in run_id:
-            return {"error": {"code": "not_found", "message": name}}
-        return FileResponse(p)
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):

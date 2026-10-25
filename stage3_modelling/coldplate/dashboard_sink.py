@@ -33,28 +33,29 @@ def atomic_write(path: Path, data: bytes):
         raise
 
 
-def run_dir(runs_dir: Path, index: int) -> Path:
-    return Path(runs_dir) / f"run_{index:04d}"
+def run_dir(runs_dir: Path, run_id: str) -> Path:
+    return Path(runs_dir) / str(run_id)
 
 
-def write_model_result(runs_dir, index, record: dict) -> Path:
+def write_model_result(runs_dir, run_id, record: dict) -> Path:
     """record: {source, label, status, params, metrics, feasible, violations,
     role, candidate_id, design_id, started_at, finished_at}"""
     rec = {"source": "stage3-reduced-order-model", "label": LABEL, **record}
-    p = run_dir(runs_dir, index) / "model_result.json"
+    p = run_dir(runs_dir, run_id) / "model_result.json"
     atomic_write(p, json.dumps(rec, indent=2).encode())
     return p
 
 
-def write_cad(runs_dir, index, files: dict):
+def write_cad(runs_dir, run_id, files: dict):
     """files: {step: bytes|None, stl: bytes|None, glb: bytes|None}."""
-    d = run_dir(runs_dir, index)
+    d = run_dir(runs_dir, run_id)
+    design_id = files.get("design_id") or run_id
     if files.get("step"):
-        atomic_write(d / "design.step", files["step"])
+        atomic_write(d / f"{design_id}.step", files["step"])
     if files.get("glb"):
-        atomic_write(d / "preview.glb", files["glb"])
+        atomic_write(d / f"{design_id}.glb", files["glb"])
     if files.get("stl"):
-        atomic_write(d / "constant" / "triSurface" / "design.stl", files["stl"])
+        atomic_write(d / f"{design_id}.stl", files["stl"])
 
 
 def candidate_record(candidate: dict, status: str = "completed",
@@ -81,10 +82,12 @@ def candidate_record(candidate: dict, status: str = "completed",
             "hbm_hottest": m.get("hbm_hottest"),
             "gpu_hottest": m.get("gpu_hottest"),
             "coolant_rise_k": m.get("coolant_rise_K"),
+            "energy_residual": m.get("energy_residual"),
         },
         "feasible": candidate.get("feasible"),
         "violations": candidate.get("violations", []),
         "role": candidate.get("role"),
         "candidate_id": candidate.get("candidate_id"),
         "design_id": candidate.get("design_id"),
+        "cad_error": candidate.get("cad_error"),
     }

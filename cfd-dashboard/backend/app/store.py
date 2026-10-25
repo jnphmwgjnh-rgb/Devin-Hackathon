@@ -22,6 +22,9 @@ class RunStore:
             case_dir / "system" / "controlDict",
             *case_dir.glob("log.*"),
             *(case_dir / "constant" / "triSurface").glob("*.stl"),
+            *case_dir.glob("*.step"),
+            *case_dir.glob("*.stl"),
+            *case_dir.glob("*.glb"),
         ]
         post_processing = case_dir / "postProcessing"
         if post_processing.is_dir():
@@ -73,16 +76,6 @@ class RunStore:
         finished = [run for run in values if run.status in {"completed", "failed"}]
         runtimes = [run.runtime_s for run in finished if run.runtime_s is not None]
         avg_runtime = sum(runtimes) / len(runtimes) if runtimes else None
-        remaining = (
-            max(0, self.cfg.budget - len(completed) - len(failed))
-            if self.cfg.budget is not None
-            else None
-        )
-        eta = (
-            remaining * avg_runtime / max(len(running), 1)
-            if remaining is not None and avg_runtime is not None
-            else None
-        )
         pressure_candidates = [
             run
             for run in completed
@@ -104,7 +97,6 @@ class RunStore:
             default=None,
         )
         return {
-            "budget": self.cfg.budget,
             "total": len(values),
             "completed": len(completed),
             "failed": len(failed),
@@ -115,7 +107,6 @@ class RunStore:
                 "max_temperature_k": best_temperature.id if best_temperature else None,
             },
             "avg_runtime_s": avg_runtime,
-            "eta_s": eta,
         }
 
     def scan(self) -> list[dict]:

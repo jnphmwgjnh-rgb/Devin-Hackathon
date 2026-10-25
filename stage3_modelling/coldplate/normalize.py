@@ -89,6 +89,7 @@ class NormalizationResult:
 @dataclass
 class _Ctx:
     document: str
+    verify_evidence: bool = True
     blocking: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     misses: list[str] = field(default_factory=list)
@@ -112,6 +113,12 @@ def _map_source(src: str) -> str:
 
 
 def _evidence_check(ctx: _Ctx, path: str, essential: bool, detail: str) -> None:
+    if not ctx.verify_evidence:
+        ctx.misses.append(f"{path}: {detail}")
+        warning = "evidence quoted by your AI, not verifiable against the diagram"
+        if warning not in ctx.warnings:
+            ctx.warnings.append(warning)
+        return
     if essential:
         ctx.blocking.append(f"{path}: {detail}")
     else:
@@ -342,8 +349,9 @@ def normalize_extraction(
     *,
     document: str,
     reference_files: Mapping[str, bytes],
+    verify_evidence: bool = True,
 ) -> NormalizationResult:
-    ctx = _Ctx(document=document)
+    ctx = _Ctx(document=document, verify_evidence=verify_evidence)
     ex = extraction
 
     # -- unsupported arrangement short-circuits the whole parse -------------
@@ -482,15 +490,17 @@ def normalize_extraction(
         # evidence: every numeric field must appear in the row quote
         if h.source in ("input", "input_flagged_assumption"):
             if not evidence_found(h.evidence, ctx.document):
-                ctx.blocking.append(
-                    f"{base}.evidence: row quote not found in document: {h.evidence!r}"
+                _evidence_check(
+                    ctx, f"{base}.evidence", True,
+                    f"row quote not found in document: {h.evidence!r}",
                 )
             else:
                 for f in ("x0", "y0", "width", "height", "power"):
                     v = getattr(h, f)
                     if v is not None and not value_in_evidence(v, h.evidence):
-                        ctx.blocking.append(
-                            f"{base}.{f}: value {v} does not appear in the row quote"
+                        _evidence_check(
+                            ctx, f"{base}.{f}", True,
+                            f"value {v} does not appear in the row quote",
                         )
         # unit conversion (as-written units)
         lunit, punit = h.length_unit, h.power_unit
@@ -733,6 +743,20 @@ def normalize_extraction(
                 note="lowest hard temperature limit among temperature_limits",
             )
             ctx.missing_opt = [m for m in ctx.missing_opt if m != "critical_component"]
+    required_limit_types = {
+        source.type for source in ex.heat_sources or [] if source.type
+    }
+    if spec.critical_component_type.value:
+        required_limit_types.add(spec.critical_component_type.value)
+    for required_type in required_limit_types:
+        if not any(
+            t.component_type.casefold() == required_type.casefold()
+            and t.hard_C.value is not None
+            for t in spec.temperature_limits
+        ):
+            ctx.missing_ess.append(
+                f"temperature_limits[{required_type}].hard_max"
+            )
 
     # -- coolant ----------------------------------------------------------------
     spec.coolant = CoolantSpec(

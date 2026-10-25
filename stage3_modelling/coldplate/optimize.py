@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import multiprocessing
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -28,6 +29,10 @@ from coldplate.geometry import (
 from coldplate.spec import EngineInputs
 
 _STEP_MM = 0.05
+
+
+def default_worker_count() -> int:
+    return min(8, os.cpu_count() or 1)
 
 
 def _levels(inputs: EngineInputs, assumptions_out: Optional[list] = None) -> list[float]:
@@ -489,14 +494,17 @@ def run_optimization(
         seed=seed,
         grid_mm=grid_mm,
         levels=levels,
-        workers=workers or min(8, os.cpu_count() or 1),
+        workers=workers if workers is not None else default_worker_count(),
         progress=progress,
         on_candidate=on_candidate,
         baseline=baseline_candidate,
         baseline_rejection=baseline_rejection,
     )
     if workers != 1:
-        context.executor = ProcessPoolExecutor(max_workers=context.workers)
+        context.executor = ProcessPoolExecutor(
+            max_workers=context.workers,
+            mp_context=multiprocessing.get_context("spawn"),
+        )
     algorithm = NSGA2(
         pop_size=pop_size,
         sampling=IntegerRandomSampling(),
