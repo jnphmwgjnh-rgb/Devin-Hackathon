@@ -96,7 +96,7 @@ def replay_bundle(bundle_dir: Path, runs_dir: Path, *,
             {**c, "role": None}, status="completed",
             started_at=t_start, finished_at=_now()))
 
-    # selecting: write roles into the five selected runs
+    # selecting: write roles into the selected runs
     emit("selecting", 0.75, "selecting pareto-optimal designs")
     sel_ids = []
     for cid, s in selected.items():
@@ -118,9 +118,14 @@ def replay_bundle(bundle_dir: Path, runs_dir: Path, *,
             continue
         ddir = bundle_dir / "designs" / s["design_id"]
         files = {}
-        for key, fname in (("stl", "design.stl"), ("step", "design.step"),
-                           ("glb", "preview.glb")):
+        for key, fname, legacy_name in (
+            ("stl", f"{s['design_id']}.stl", "design.stl"),
+            ("step", f"{s['design_id']}.step", "design.step"),
+            ("glb", f"{s['design_id']}.glb", "preview.glb"),
+        ):
             p = ddir / fname
+            if not p.exists():
+                p = ddir / legacy_name
             if p.exists():
                 files[key] = p.read_bytes()
         write_cad(runs_dir, idx, files)

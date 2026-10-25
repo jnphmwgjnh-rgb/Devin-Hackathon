@@ -78,6 +78,33 @@
           "default": "infeasible",
           "title": "Status Label",
           "type": "string"
+        },
+        "files": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/FileRef"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Files"
+        },
+        "cad_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cad Error"
         }
       },
       "required": [
@@ -85,6 +112,52 @@
         "design_id"
       ],
       "title": "CandidateRecord",
+      "type": "object"
+    },
+    "FileRef": {
+      "additionalProperties": true,
+      "properties": {
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "path": {
+          "default": "",
+          "title": "Path",
+          "type": "string"
+        },
+        "bytes": {
+          "default": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "default": "",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "convention": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Convention"
+        }
+      },
+      "title": "FileRef",
       "type": "object"
     },
     "SelectedDesign": {
@@ -166,6 +239,33 @@
           "title": "Status Label",
           "type": "string"
         },
+        "files": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/FileRef"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Files"
+        },
+        "cad_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cad Error"
+        },
         "role_label": {
           "anyOf": [
             {
@@ -203,19 +303,6 @@
           ],
           "default": null,
           "title": "Acceptance"
-        },
-        "files": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Files"
         },
         "cad_check": {
           "anyOf": [
@@ -358,6 +445,12 @@
       "additionalProperties": true,
       "default": {},
       "title": "Pareto",
+      "type": "object"
+    },
+    "optimizer": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Optimizer",
       "type": "object"
     },
     "selected_designs": {

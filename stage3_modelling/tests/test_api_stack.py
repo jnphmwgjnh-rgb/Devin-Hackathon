@@ -4,17 +4,20 @@ import io
 import json
 import time
 import zipfile
+from itertools import product
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from coldplate.extraction_schema import RequirementsExtraction
-from coldplate.geometry import baseline_design, build_layout, GeometryError
+from coldplate.geometry import (
+    baseline_design, build_layout, derive_zone_bands, GeometryError,
+)
 from coldplate.normalize import normalize_extraction
 from coldplate.optimize import (
-    _dominates, generate_candidates, requirement_conflicts,
-    run_optimization, select_designs,
+    _dominates, _levels, generate_candidates, requirement_conflicts,
+    select_designs,
 )
 from coldplate.pipeline import run_job
 from coldplate.results_models import ResultsDoc
@@ -26,7 +29,7 @@ CSV = (FIXTURES / "reference_files" / "power_map_W_per_mm2.csv").read_bytes()
 REF = {"power_map_W_per_mm2.csv": CSV}
 
 FAST = {"parser": "recorded", "prompt_version": "v2", "use_cache": False,
-        "n_candidates": 8, "seed": 42, "grid_mm": 1.0, "sweep": True,
+        "pop_size": 8, "n_gen": 2, "seed": 42, "grid_mm": 1.0, "sweep": True,
         "export_cad": True}
 
 
@@ -46,20 +49,25 @@ def inputs_A():
 # ---------------------------------------------------------------- optimize
 
 
-def test_seed_determinism():
+def test_index_vector_candidate_ids():
     ei = inputs_A()
-    a, _ = generate_candidates(ei, n=8, seed=42)
-    b, _ = generate_candidates(ei, n=8, seed=42)
-    c, _ = generate_candidates(ei, n=8, seed=7)
-    key = lambda d: (d.zones[0].fin_thickness_mm,
-                     tuple(z.channel_width_mm for z in d.zones))
-    assert [key(x) for x in a] == [key(x) for x in b]
-    assert [key(x) for x in a] != [key(x) for x in c]
+    vector = (4, 4, 4)
+    a, rejected_a = generate_candidates(ei, [vector], candidate_ids=["c123"])
+    b, rejected_b = generate_candidates(ei, [vector], candidate_ids=["c123"])
+    assert not rejected_a and not rejected_b
+    assert a[0].design_id == b[0].design_id == "c123"
+    assert a[0].zones == b[0].zones
+    assert a[0].zones[0].fin_thickness_mm == _levels(ei)[vector[0]]
 
 
 def test_all_candidates_wall_thickness():
     ei = inputs_A()
-    designs, _ = generate_candidates(ei, n=48, seed=42)
+    levels = _levels(ei)
+    labels = {label for label, _, _ in derive_zone_bands(ei, ei.flow_axis)}
+    vectors = list(product(range(len(levels)), repeat=1 + len(labels)))[:48]
+    designs, _ = generate_candidates(
+        ei, vectors, candidate_ids=[f"c{i + 1:03d}" for i in range(len(vectors))]
+    )
     for d in designs:
         la = build_layout(ei, d)  # build_layout itself validates wall thickness
         spans = sorted((f.y0, f.y1) for f in la.fins)
@@ -126,8 +134,11 @@ def test_A_endtoend(tmp_path):
     assert spec["total_power_W"] == pytest.approx(1492.8)
     assert spec["coolant"]["flow_rate_Lpm"]["value"] == 2.0
     sel = res["selected_designs"]
-    assert len(sel) == 5
-    assert len({s["design_id"] for s in sel}) == 5
+    assert len(sel) <= 3
+    assert {s["role"] for s in sel} <= {
+        "pressure_focused", "cooling_focused", "balanced"
+    }
+    assert len({s["design_id"] for s in sel}) == len(sel)
     # files exist + manifest sha
     manifest = json.loads((tmp_path / "jobA" / "manifest.json").read_text())
     by_path = {e["path"]: e for e in manifest["files"]}
@@ -191,5 +202,4 @@ def test_F_all_infeasible(tmp_path):
     assert res["status"] == "completed"
     assert res["pareto"]["n_feasible"] == 0
     assert res["pareto"]["all_infeasible"] is True
-    assert all(s["status_label"] == "infeasible" for s in res["selected_designs"])
-    assert all(s["role"] == "infeasible" for s in res["selected_designs"])
+    assert res["selected_designs"] == []

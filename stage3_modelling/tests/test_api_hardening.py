@@ -29,7 +29,8 @@ def _body(**over):
         "reference_files": [],
         "options": {
             "parser": "recorded", "recording": REC,
-            "n_candidates": 4, "grid_mm": 1.0, "sweep": False, "export_cad": False,
+            "pop_size": 4, "n_gen": 1, "grid_mm": 1.0,
+            "sweep": False, "export_cad": False,
         },
     }
     b.update(over)

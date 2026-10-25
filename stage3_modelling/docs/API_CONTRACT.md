@@ -61,7 +61,8 @@ JSON body, or `multipart/form-data` with fields `requirements` (the .md file),
     "parser": "devin",          // "devin" (live, default) | "recorded" | "manual"
     "prompt_version": "v2",
     "use_cache": true,          // identical documents do not re-consume Devin quota
-    "n_candidates": 48,
+    "pop_size": 24,
+    "n_gen": 8,
     "seed": 42,
     "grid_mm": 0.5,
     "sweep": true,
@@ -71,6 +72,12 @@ JSON body, or `multipart/form-data` with fields `requirements` (the .md file),
 ```
 
 Response `202`: `{"job_id": "...", "status": "queued", "links": {"job": "...", "results": "..."}}`.
+
+The optimizer is integer-coded NSGA-II. Its search evaluation budget is
+`pop_size * n_gen`; baseline `c000` is evaluated separately. Duplicate genotypes
+and geometry rejections reduce actual search simulations, so evaluation progress
+is based on completed unique simulations and can finish below the planned budget.
+`optimizer.n_evaluated` counts valid unique evaluations including the baseline.
 
 ### Job lifecycle (`GET /api/jobs/{id}`)
 
@@ -92,15 +99,17 @@ inputs/requirements.md             uploaded document, verbatim
 inputs/reference/<name>            uploaded reference files, verbatim
 inputs/normalized_spec.json        normalized inputs with per-field provenance
 designs/<design_id>/design.json    params, metrics, sweep, acceptance, cad_check, file refs
-designs/<design_id>/design.step    CAD (mm, plate frame)
-designs/<design_id>/design.stl     CAD mesh
-designs/<design_id>/preview.glb    lightweight preview mesh
+designs/<design_id>/<design_id>.step  CAD (mm, plate frame)
+designs/<design_id>/<design_id>.stl   CAD mesh
+designs/<design_id>/<design_id>.glb   lightweight preview mesh
 designs/<design_id>/fields.json    chip-plane temperature, velocity, heat-flux maps
 designs/<design_id>/geometry.json  fin/channel/opening layout
 ```
 
-CAD, preview, fields and geometry files exist **only for the five selected designs**.
-Every candidate has metrics in `results.json` and `candidates.csv`.
+STEP/STL/GLB files are exported for every feasible nondominated candidate and any
+other selected design; filenames use the full design ID. `design.json`, fields,
+geometry and sweeps are produced only for selected designs. An individual CAD
+export failure is recorded as `cad_error` on that candidate and does not fail the job.
 
 ## Results document (`results.json`)
 
@@ -113,19 +122,21 @@ Every candidate has metrics in `results.json` and `candidates.csv`.
 | `normalized_inputs` | the normalized spec. Every value is `{value, unit, source, evidence, note, original}`, with `source` ∈ `input`, `input_flagged_assumption`, `assumed`, `derived`, `engine_default`, `missing` |
 | `assumptions` | `[{field, statement, origin: document\|devin\|engine}]`: everything not stated outright |
 | `requirement_conflicts` | geometry-independent impossibilities, e.g. the 1.0 L/min sweep point exceeding the 12 K outlet-rise rule |
-| `simulation` | model id/label, nominal condition, grid, power map applied, correlations, assumptions, candidate/rejected counts, seed, runtimes |
+| `simulation` | model id/label, nominal condition, grid, power map applied, correlations, assumptions, candidate/rejected counts, seed, runtimes (`optimization`, `cad_export`, `total`) |
+| `optimizer` | `{name, pop_size, n_gen, seed, n_evaluated, n_geometry_rejected}` |
 | `objectives` | `x` = `{key: "pressure_drop_kPa", label, direction}`, `y` = `{key: "critical_temperature_C", label, component_type}` (ITherm: hottest HBM), `alternatives` (e.g. `worst_margin_K`) |
 | `constraints` | `[{key, label, unit, limit, target, stretch, acceptance, kind}]` used for limit lines |
 | `candidates[]` | every evaluated design (schema below) |
 | `rejected_candidates[]` | `{candidate_id, params, reason}`: geometry that violated manufacturing limits and was never simulated |
 | `pareto` | `front_candidate_ids` (feasible nondominated, sorted by x), `n_evaluated`, `n_feasible`, `n_nondominated`, `all_infeasible` |
-| `selected_designs[]` | the five designs to show (schema below), ordered by pressure drop |
+| `selected_designs[]` | up to three distinct Pareto-role designs, ordered by pressure drop |
 | `warnings`, `links` | free-text warnings; API links (`self`, `manifest`, `candidates_csv`, `bundle`) |
 
 **Candidate** (`candidates[i]`):
 `candidate_id`, `design_id`, `is_baseline`, `params`, `metrics`, `feasible`, `violations[{constraint, value, limit}]`,
 `targets_met{...}`, `worst_case{flow_Lpm, inlet_C, gpu_max_C, hbm_max_C, coolant_rise_K, margin_ok, failures}`,
-`pareto{nondominated, rank}`, `selected`, `role`, `status_label`.
+`pareto{nondominated, rank}`, `selected`, `role`, `status_label`, optional
+`files{step, stl, glb}` and `cad_error`.
 - `params`: `arrangement` (`split_edges_to_center` …), `flow_axis`, `fin_height_mm`, `fin_thickness_mm`,
   `channel_width_by_zone_mm{zone: w}`, `zones[{label, v_start_mm, v_end_mm, channel_width_mm,
   actual_channel_width_mm, fin_thickness_mm, n_channels}]`, `n_channels`, `n_fins`, `inlet_opening_mm`,
@@ -137,9 +148,12 @@ Every candidate has metrics in `results.json` and `candidates.csv`.
   `infeasible` (violates a hard limit at the nominal condition).
 
 **Selected design** (`selected_designs[i]`): every candidate field, plus
-`role` ∈ `pressure_focused | pressure_leaning | balanced | cooling_leaning | cooling_focused`,
-`role_label`, and `dominated`/`feasible` flags. If fewer than five feasible nondominated designs
-exist, the rest are labelled `dominated` or `infeasible`; designs are never relabelled as feasible.
+`role` ∈ `pressure_focused | balanced | cooling_focused`, `role_label`,
+and `dominated`/`feasible` flags. Roles are selected only from the feasible
+nondominated front: minimum pressure drop, minimum critical temperature, and
+minimum normalized Euclidean distance to the utopia point. If there are fewer
+than three distinct role picks, fewer designs are returned; dominated or
+infeasible candidates are not substituted.
 Also included:
 - `sweep{flows_Lpm, inlet_temperatures_C, points[{flow_Lpm, pressure_drop_kPa, pumping_power_W,
   coolant_rise_K, rise_ok, by_inlet[{inlet_C, gpu_max_C, hbm_max_C, critical_temperature_C,

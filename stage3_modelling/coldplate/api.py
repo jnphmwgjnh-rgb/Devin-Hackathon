@@ -50,7 +50,8 @@ class Options(BaseModel):
     parser: str = "devin"
     prompt_version: str = "v2"
     use_cache: bool = True
-    n_candidates: int = Field(48, ge=4, le=200)
+    pop_size: int = Field(24, ge=4, le=200)
+    n_gen: int = Field(8, ge=1, le=200)
     seed: int = 42
     grid_mm: float = Field(0.5, ge=0.25, le=2.0)
     sweep: bool = True
@@ -281,9 +282,9 @@ def design(design_id: str):
 @app.get("/api/designs/{design_id}/cad")
 def design_cad(design_id: str, format: str = "step"):
     ddir, _ = _design_doc(design_id)
-    name = {"step": "design.step", "stl": "design.stl", "glb": "preview.glb"}.get(format)
-    if name is None:
+    if format not in {"step", "stl", "glb"}:
         return err(422, "bad_format", "format must be step|stl|glb")
+    name = f"{design_id}.{format}"
     f = ddir / name
     if not f.exists():
         return err(404, "not_found", f"no {format} for {design_id}")

@@ -112,7 +112,7 @@ Prompt eval reports land in `prompts/requirements_parser/eval/`; see
 
 Each job writes a self-contained bundle under `runs/jobs/<job_id>/`
 (manifest.json, results.json, candidates.csv, interpretation.json, inputs/,
-designs/<id>/{design.json,.step,.stl,preview.glb,fields.json,geometry.json}).
+designs/<id>/{design.json,<id>.step,<id>.stl,<id>.glb,fields.json,geometry.json}).
 Contract: `docs/API_CONTRACT.md`; results JSON Schema: `docs/results.schema.json`
 (regenerate via `stage3_modelling/scripts/export_results_schema.py`). The reusable React/Plotly
 Pareto component lives in `stage3_modelling/frontend/src/pareto/` and is exported from

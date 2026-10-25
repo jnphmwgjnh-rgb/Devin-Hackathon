@@ -27,7 +27,8 @@ DEFAULT_OPTIONS = {
     "parser": "devin",
     "prompt_version": "v2",
     "use_cache": True,
-    "n_candidates": 48,
+    "pop_size": 24,
+    "n_gen": 8,
     "seed": 42,
     "grid_mm": 0.5,
     "sweep": True,
@@ -105,7 +106,8 @@ def run_job(
         "inputs": {}, "interpretation": {}, "normalized_inputs": None,
         "assumptions": [], "requirement_conflicts": [], "simulation": {},
         "objectives": None, "constraints": [], "candidates": [],
-        "rejected_candidates": [], "pareto": {}, "selected_designs": [],
+        "rejected_candidates": [], "pareto": {}, "optimizer": {},
+        "selected_designs": [],
         "warnings": [], "links": {},
     }
     links = {
@@ -243,11 +245,13 @@ def run_job(
         frac = 0.2 + 0.5 * (k / max(n_, 1))
         emit("evaluate", frac, msg)
 
+    optimization_started = time.perf_counter()
     opt = run_optimization(
-        inputs, n=opts["n_candidates"], seed=opts["seed"],
+        inputs, pop_size=opts["pop_size"], n_gen=opts["n_gen"], seed=opts["seed"],
         grid_mm=opts["grid_mm"], progress=ev_progress,
-        on_candidate=on_candidate,
+        workers=opts.get("workers"), on_candidate=on_candidate,
     )
+    optimization_seconds = time.perf_counter() - optimization_started
     emit("select", 0.7, "selecting designs")
     selected = select_designs(opt)
     if on_selected:
@@ -263,7 +267,7 @@ def run_job(
         rec = {
             "candidate_id": c.candidate_id,
             "design_id": f"{job_id}-{c.candidate_id}",
-            "is_baseline": c.candidate_id == "baseline" or c.design.design_id == "baseline",
+            "is_baseline": c.candidate_id == "c000",
             "params": c.params, "metrics": c.metrics,
             "feasible": c.feasible, "violations": c.violations,
             "targets_met": c.targets_met, "worst_case": c.worst_case,
@@ -280,6 +284,7 @@ def run_job(
         "n_nondominated": opt.n_nondominated,
         "all_infeasible": opt.all_infeasible,
     }
+    results["optimizer"] = opt.algorithm
     results["warnings"].extend(opt.warnings)
 
     # ---- candidates.csv -------------------------------------------------------
@@ -313,7 +318,65 @@ def run_job(
         ])
     bundle.write("candidates.csv", buf.getvalue(), role="candidates_csv")
 
-    # ---- sweep + export the five ---------------------------------------------
+    # ---- export every Pareto design; sweep only selected designs --------------
+    cad_files_by_candidate = {}
+    cad_check_by_candidate = {}
+    cad_candidates = {
+        candidate.candidate_id: candidate
+        for candidate in opt.candidates if candidate.nondominated
+    }
+    cad_candidates.update({candidate.candidate_id: candidate for candidate in selected})
+    cad_export_started = time.perf_counter()
+    for cid, candidate in sorted(
+        cad_candidates.items(), key=lambda item: int(item[0][1:])
+    ):
+        did = f"{job_id}-{cid}"
+        rec = next(row for row in cand_rows if row["candidate_id"] == cid)
+        if not opts["export_cad"]:
+            continue
+        emit("export", 0.7, f"exporting CAD {did}")
+        try:
+            art = export_design(
+                candidate.nominal_eval.layout,
+                str(job_dir / "designs" / did),
+                name=did,
+            )
+            file_refs = {}
+            for role, path, manifest_role in (
+                ("step", Path(art.step_path), "cad_step"),
+                ("stl", Path(art.stl_path), "cad_stl"),
+                ("glb", Path(art.glb_path), "cad_glb"),
+            ):
+                rel = f"designs/{did}/{path.name}"
+                entry = bundle.write(
+                    rel, path.read_bytes(), role=manifest_role, design_id=did
+                )
+                file_refs[role] = {
+                    "url": f"/api/results/{job_id}/files/{rel}",
+                    "path": entry["path"],
+                    "bytes": entry["bytes"],
+                    "sha256": entry["sha256"],
+                }
+            file_refs["glb"]["convention"] = art.glb_convention
+            cad_files_by_candidate[cid] = file_refs
+            cad_check_by_candidate[cid] = {
+                "bbox_mm": list(art.bbox_mm), "volume_mm3": art.volume_mm3,
+                "model_volume_mm3": art.model_volume_mm3,
+                "volume_rel_err": abs(art.volume_mm3 - art.model_volume_mm3)
+                / art.model_volume_mm3,
+                "fin_count": art.fin_count, "valid": art.is_valid,
+            }
+            rec["files"] = file_refs
+            if on_cad:
+                on_cad(did, {
+                    "step": Path(art.step_path).read_bytes(),
+                    "stl": Path(art.stl_path).read_bytes(),
+                    "glb": Path(art.glb_path).read_bytes(),
+                })
+        except Exception as exc:
+            rec["cad_error"] = str(exc)
+    cad_export_seconds = time.perf_counter() - cad_export_started
+
     sel_docs = []
     n_sel = len(selected)
     for k, c in enumerate(selected):
@@ -324,38 +387,27 @@ def run_job(
             sw = sweep_design(inputs, c.design, grid_mm=opts["grid_mm"])
         else:
             sw = None
-        emit("export", base_frac + 0.2 / max(n_sel, 1), f"exporting {did}")
+        emit("export", base_frac + 0.2 / max(n_sel, 1), f"exporting fields {did}")
         layout = c.nominal_eval.layout
-        files = {}
-        cad_check = None
         ddir = f"designs/{did}"
-        if opts["export_cad"]:
-            art = export_design(layout, str(job_dir / ddir), name="design")
-            # rename exports to contract names
-            step_e = bundle.write(f"{ddir}/design.step",
-                                  Path(job_dir / ddir / "design.step").read_bytes(),
-                                  role="cad_step", design_id=did)
-            stl_e = bundle.write(f"{ddir}/design.stl",
-                                 Path(job_dir / ddir / "design.stl").read_bytes(),
-                                 role="cad_stl", design_id=did)
-            glb_e = bundle.write(f"{ddir}/preview.glb",
-                                 Path(job_dir / ddir / "design.glb").read_bytes(),
-                                 role="cad_glb", design_id=did)
-            (job_dir / ddir / "design.glb").unlink(missing_ok=True)  # contract keeps preview.glb only
-            files["step"] = _file_ref(did, step_e, "cad?format=step")
-            files["stl"] = _file_ref(did, stl_e, "cad?format=stl")
-            files["glb"] = {**_file_ref(did, glb_e, "cad?format=glb"),
-                            "convention": art.glb_convention}
-            cad_check = {
-                "bbox_mm": list(art.bbox_mm), "volume_mm3": art.volume_mm3,
-                "model_volume_mm3": art.model_volume_mm3,
-                "volume_rel_err": abs(art.volume_mm3 - art.model_volume_mm3) / art.model_volume_mm3,
-                "fin_count": art.fin_count, "valid": art.is_valid,
+        files = {}
+        if c.candidate_id in cad_files_by_candidate:
+            files.update(cad_files_by_candidate[c.candidate_id])
+            files["step"] = _file_ref(
+                did, {"path": files["step"]["path"], "bytes": files["step"]["bytes"],
+                      "sha256": files["step"]["sha256"]}, "cad?format=step"
+            )
+            files["stl"] = _file_ref(
+                did, {"path": files["stl"]["path"], "bytes": files["stl"]["bytes"],
+                      "sha256": files["stl"]["sha256"]}, "cad?format=stl"
+            )
+            files["glb"] = {
+                **_file_ref(
+                    did, {"path": files["glb"]["path"], "bytes": files["glb"]["bytes"],
+                          "sha256": files["glb"]["sha256"]}, "cad?format=glb"
+                ),
+                "convention": cad_files_by_candidate[c.candidate_id]["glb"]["convention"],
             }
-            if on_cad:
-                on_cad(did, {"step": Path(art.step_path).read_bytes(),
-                             "stl": Path(art.stl_path).read_bytes(),
-                             "glb": Path(art.glb_path).read_bytes()})
         ev_fields = evaluate(inputs, c.design, grid_mm=opts["grid_mm"], want_fields=True)
         fe = bundle.write(f"{ddir}/fields.json",
                           {"schema_version": "coldplate-fields/1", **ev_fields.fields},
@@ -380,7 +432,8 @@ def run_job(
                       "inlet_temperatures_C": sw["inlet_temperatures_C"],
                       "points": sw["points"]} if sw else None,
             "acceptance": sw["acceptance"] if sw else None,
-            "files": files, "cad_check": cad_check,
+            "files": files,
+            "cad_check": cad_check_by_candidate.get(c.candidate_id),
         }
         sel_docs.append(ddoc)
         bundle.write(f"{ddir}/design.json", ddoc, role="design", design_id=did)
@@ -394,7 +447,11 @@ def run_job(
         "power_map_applied": spec.power_map.applied if spec.power_map else None,
         "n_candidates": opt.n_evaluated, "n_rejected": len(opt.rejected),
         "seed": opts["seed"],
-        "runtimes_s": {"total": round(time.perf_counter() - t0, 3)},
+        "runtimes_s": {
+            "optimization": round(optimization_seconds, 3),
+            "cad_export": round(cad_export_seconds, 3),
+            "total": round(time.perf_counter() - t0, 3),
+        },
     }
     results["status"] = "completed"
     _finish(bundle, results, job_id, t_created)

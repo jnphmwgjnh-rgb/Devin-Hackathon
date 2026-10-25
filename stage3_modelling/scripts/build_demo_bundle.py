@@ -19,7 +19,7 @@ def main():
         ddir = job / "designs" / s["design_id"]
         od = out / "designs" / s["design_id"]
         od.mkdir(parents=True, exist_ok=True)
-        for f in ("design.stl",):
+        for f in (f"{s['design_id']}.stl",):
             p = ddir / f
             if p.exists(): shutil.copy2(p, od / f)
     sess = (res.get("interpretation", {}).get("sessions") or [{}])[0]

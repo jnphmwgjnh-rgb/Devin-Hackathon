@@ -35,7 +35,8 @@ def main():
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--api", default="http://127.0.0.1:8000")
     ap.add_argument("--export-sample", action="store_true")
-    ap.add_argument("--n-candidates", type=int, default=48)
+    ap.add_argument("--pop-size", type=int, default=24)
+    ap.add_argument("--n-gen", type=int, default=8)
     ap.add_argument("--grid-mm", type=float, default=0.5)
     a = ap.parse_args()
 
@@ -49,7 +50,8 @@ def main():
     ]
 
     options = {"parser": a.parser, "prompt_version": a.prompt_version,
-               "use_cache": not a.no_cache, "n_candidates": a.n_candidates,
+               "use_cache": not a.no_cache, "pop_size": a.pop_size,
+               "n_gen": a.n_gen,
                "grid_mm": a.grid_mm, "sweep": True, "export_cad": True}
     if a.parser == "recorded":
         rec = (ROOT / "tests/fixtures/devin_recordings"

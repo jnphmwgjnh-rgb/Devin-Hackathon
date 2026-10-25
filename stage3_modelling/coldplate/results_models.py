@@ -33,13 +33,15 @@ class CandidateRecord(FlexModel):
     selected: bool = False
     role: Optional[str] = None
     status_label: str = "infeasible"
+    files: Optional[dict[str, FileRef]] = None
+    cad_error: Optional[str] = None
 
 
 class SelectedDesign(CandidateRecord):
     role_label: Optional[str] = None
     sweep: Optional[dict] = None
     acceptance: Optional[dict] = None
-    files: Optional[dict] = None
+    files: Optional[dict[str, FileRef]] = None
     cad_check: Optional[dict] = None
 
 
@@ -71,6 +73,7 @@ class ResultsDoc(FlexModel):
     candidates: list[CandidateRecord] = []
     rejected_candidates: list = []
     pareto: dict = {}
+    optimizer: dict = {}
     selected_designs: list[SelectedDesign] = []
     warnings: list = []
     links: dict = {}

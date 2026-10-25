@@ -77,15 +77,20 @@ def _run_live(runs_dir, document, reference_files):
     from coldplate.pipeline import run_job
     runs = Path(runs_dir)
     n = [0]
+    run_index = [0]
 
     def on_candidate(c):
-        n[0] += 1
-        write_model_result(runs, n[0], candidate_record(
+        run_index[0] += 1
+        if c.candidate_id != "c000":
+            n[0] += 1
+        write_model_result(runs, run_index[0], candidate_record(
             {"candidate_id": c.candidate_id, "params": c.params,
              "metrics": c.metrics, "feasible": c.feasible,
              "violations": c.violations, "role": None, "design_id": c.candidate_id},
             status="completed", started_at=_now(), finished_at=_now()))
-        _set(progress=0.2 + 0.6 * n[0] / 48, message=f"evaluated {n[0]}/48")
+        planned = 24 * 8
+        _set(progress=0.2 + 0.6 * min(n[0] / planned, 1.0),
+             message=f"evaluated {n[0]}/{planned}")
 
     def on_interp(info):
         _set(interpretation=info)
@@ -93,7 +98,7 @@ def _run_live(runs_dir, document, reference_files):
     job_dir = _STAGE3 / "runs" / "jobs" / f"live-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
     run_job(job_dir, document, reference_files,
             {"parser": "devin", "prompt_version": "v2", "use_cache": True,
-             "n_candidates": 48, "seed": 42, "grid_mm": 0.5,
+             "pop_size": 24, "n_gen": 8, "seed": 42, "grid_mm": 0.5,
              "sweep": True, "export_cad": True},
             on_interpretation=on_interp, on_candidate=on_candidate)
     return {"status": "completed", "n_runs": n[0]}

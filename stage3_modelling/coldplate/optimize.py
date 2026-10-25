@@ -3,11 +3,22 @@
 from __future__ import annotations
 
 import math
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional, Sequence
+from types import SimpleNamespace
 
 import numpy as np
-from scipy.stats import qmc
+import pymoo
+from pymoo.core.callback import Callback
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.core.problem import Problem
+from pymoo.optimize import minimize
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.repair.rounding import RoundingRepair
+from pymoo.operators.sampling.rnd import IntegerRandomSampling
 
 from coldplate.evaluate import bulk_temperature_rise, evaluate
 from coldplate.geometry import (
@@ -35,13 +46,12 @@ def _levels(inputs: EngineInputs, assumptions_out: Optional[list] = None) -> lis
 
 def generate_candidates(
     inputs: EngineInputs,
+    index_vectors: Iterable[Sequence[int]],
     *,
-    n: int = 48,
-    seed: int = 42,
+    candidate_ids: Optional[Sequence[str]] = None,
     assumptions_out: Optional[list] = None,
 ) -> tuple[list[ChannelDesign], list[dict]]:
-    """LHS over (shared fin thickness, per-zone-label channel width) on
-    0.05 mm manufacturing levels. Returns (designs, rejected)."""
+    """Build designs from integer level indices; return designs and rejections."""
     levels = _levels(inputs, assumptions_out)
     bands = derive_zone_bands(inputs, inputs.flow_axis)
     labels = []
@@ -49,7 +59,6 @@ def generate_candidates(
         if label not in labels:
             labels.append(label)
     d = 1 + len(labels)
-    base = baseline_design(inputs)
     openings = dict(
         inlet_opening_mm=inputs.inlet_opening_mm,
         outlet_opening_mm=inputs.outlet_opening_mm,
@@ -58,9 +67,18 @@ def generate_candidates(
 
     designs: list[ChannelDesign] = []
     rejected: list[dict] = []
-    seen: set = set()
+    vectors = [tuple(int(i) for i in row) for row in index_vectors]
+    ids = list(candidate_ids) if candidate_ids is not None else [
+        f"c{i + 1:03d}" for i in range(len(vectors))
+    ]
+    if len(ids) != len(vectors):
+        raise ValueError("candidate_ids must match index_vectors")
 
-    def build(t: float, widths: list[float], cid: str) -> Optional[ChannelDesign]:
+    for idx, cid in zip(vectors, ids):
+        if len(idx) != d or any(i < 0 or i >= len(levels) for i in idx):
+            raise ValueError(f"invalid design index vector {idx!r}; expected {d} indices")
+        t = levels[idx[0]]
+        widths = [levels[i] for i in idx[1:]]
         zones = tuple(
             FinZone(label, v0, v1, t, widths[labels.index(label)])
             for label, v0, v1 in bands
@@ -81,42 +99,8 @@ def generate_candidates(
                 },
                 "reason": str(e),
             })
-            return None
-        return d_
-
-    # c000 = baseline when it builds
-    k = 0
-    try:
-        build_layout(inputs, base)
-        designs.append(base)
-        k = 1
-    except GeometryError:
-        pass
-
-    sampler = qmc.LatinHypercube(d, seed=seed)
-    draws_needed = n - len(designs)
-    made = 0
-    total_draws = 0
-    while made < draws_needed and total_draws < 10 * n:
-        batch = sampler.random(n=max(draws_needed - made, 4))
-        total_draws += len(batch)
-        for row in batch:
-            if made >= draws_needed:
-                break
-            idx = [min(int(u * len(levels)), len(levels) - 1) for u in row]
-            key = tuple(idx)
-            if key in seen:
-                continue
-            seen.add(key)
-            t = levels[idx[0]]
-            ws = [levels[i] for i in idx[1:]]
-            cid = f"c{len(designs) + len(rejected) + 0:03d}"
-            # keep candidate ids dense-ish: c001...
-            cid = f"c{len(designs):03d}"
-            dsg = build(t, ws, cid)
-            if dsg is not None:
-                designs.append(dsg)
-                made += 1
+        else:
+            designs.append(d_)
     return designs, rejected
 
 
@@ -150,6 +134,7 @@ class OptimizationResult:
     critical_type: Optional[str]
     seed: int
     warnings: list = field(default_factory=list)
+    algorithm: dict = field(default_factory=dict)
 
 
 def _violations(inputs: EngineInputs, ev) -> list:
@@ -208,79 +193,347 @@ def _dominates(a: tuple, b: tuple) -> bool:
     return (a[0] <= b[0] and a[1] <= b[1]) and (a[0] < b[0] or a[1] < b[1])
 
 
-def run_optimization(
-    inputs: EngineInputs,
-    *,
-    n: int = 48,
-    seed: int = 42,
-    grid_mm: float = 0.5,
-    progress: Optional[Callable] = None,
-    on_candidate: Optional[Callable] = None,
-) -> OptimizationResult:
-    assumptions: list[str] = []
-    designs, rejected = generate_candidates(
-        inputs, n=n, seed=seed, assumptions_out=assumptions
+def _constraint_values(inputs: EngineInputs, ev) -> list[float]:
+    values = []
+    for component in ev.thermal.components:
+        limit = (inputs.limits_C or {}).get(component["type"])
+        if limit is not None:
+            values.append((component["max_C"] - limit) / limit)
+    if inputs.dp_hard_Pa is not None:
+        values.append((ev.hydraulics.dP_total_Pa - inputs.dp_hard_Pa) / inputs.dp_hard_Pa)
+    if inputs.max_outlet_rise_K is not None:
+        values.append((ev.thermal.rise_K - inputs.max_outlet_rise_K)
+                      / inputs.max_outlet_rise_K)
+    return values or [-1.0]
+
+
+def _constraint_count(inputs: EngineInputs) -> int:
+    count = sum(
+        1 for source in inputs.sources
+        if (inputs.limits_C or {}).get(source.type) is not None
     )
-    crit_type = inputs.critical_type
+    count += int(inputs.dp_hard_Pa is not None)
+    count += int(inputs.max_outlet_rise_K is not None)
+    return max(count, 1)
+
+
+def _evaluate_candidate_worker(
+    inputs: EngineInputs, design: ChannelDesign, grid_mm: float
+) -> tuple[CandidateEval, list[float]]:
+    ev = evaluate(inputs, design, grid_mm=grid_mm)
+    violations = _violations(inputs, ev)
     flows = list(inputs.flow_sweep_Lpm or [])
     wc_flow = min(flows) if flows else None
     inlets = list(inputs.inlet_sweep_C or [])
     wc_inlet = max(inlets) if inlets else None
+    if wc_flow is not None and wc_flow != inputs.flow_Lpm:
+        ev_wc = evaluate(inputs, design, flow_Lpm=wc_flow, grid_mm=grid_mm)
+    else:
+        ev_wc = ev
+    inlet_delta = wc_inlet - inputs.inlet_C if wc_inlet is not None else 0.0
+    wc = {
+        "flow_Lpm": wc_flow if wc_flow is not None else inputs.flow_Lpm,
+        "inlet_C": wc_inlet if wc_inlet is not None else inputs.inlet_C,
+        "gpu_max_C": (ev_wc.thermal.gpu_max_C or 0) + inlet_delta,
+        "hbm_max_C": (ev_wc.thermal.hbm_max_C or 0) + inlet_delta,
+        "coolant_rise_K": ev_wc.thermal.rise_K,
+        "margin_ok": True,
+        "failures": [],
+    }
+    for component in ev_wc.thermal.components:
+        limit = (inputs.limits_C or {}).get(component["type"])
+        if limit is not None and component["max_C"] + inlet_delta > limit:
+            wc["failures"].append({
+                "component": component["name"],
+                "max_C": component["max_C"] + inlet_delta,
+                "limit_C": limit,
+            })
+    wc["margin_ok"] = not wc["failures"]
+    targets = {}
+    for component in ev.thermal.components:
+        target = (inputs.targets_C or {}).get(component["type"])
+        if target is not None:
+            targets[component["name"]] = component["max_C"] <= target
+    candidate = CandidateEval(
+        candidate_id=design.design_id,
+        design=design,
+        params=_params(inputs, design),
+        metrics=_metrics(inputs, ev, inputs.critical_type),
+        feasible=not violations,
+        violations=violations,
+        targets_met=targets,
+        worst_case=wc,
+        nominal_eval=SimpleNamespace(layout=ev.layout),
+    )
+    return candidate, _constraint_values(inputs, ev)
 
-    cands: list[CandidateEval] = []
-    for k, des in enumerate(designs):
-        ev = evaluate(inputs, des, grid_mm=grid_mm)
-        viol = _violations(inputs, ev)
-        # worst case: min flow (full solve at nominal inlet) + inlet shift
-        if wc_flow is not None and wc_flow != inputs.flow_Lpm:
-            ev_wc = evaluate(inputs, des, flow_Lpm=wc_flow, grid_mm=grid_mm)
-        else:
-            ev_wc = ev
-        d_in = (wc_inlet - inputs.inlet_C) if wc_inlet is not None else 0.0
-        wc_gpu = (ev_wc.thermal.gpu_max_C or 0) + d_in
-        wc_hbm = (ev_wc.thermal.hbm_max_C or 0) + d_in
-        wc = {
-            "flow_Lpm": wc_flow if wc_flow is not None else inputs.flow_Lpm,
-            "inlet_C": wc_inlet if wc_inlet is not None else inputs.inlet_C,
-            "gpu_max_C": wc_gpu, "hbm_max_C": wc_hbm,
-            "coolant_rise_K": ev_wc.thermal.rise_K,
-            "margin_ok": True,
-            "failures": [],
+
+class _OptimizationProblem(Problem):
+    def __init__(
+        self,
+        inputs: EngineInputs,
+        *,
+        pop_size: int,
+        n_gen: int,
+        seed: int,
+        grid_mm: float,
+        levels: list[float],
+        workers: int,
+        progress: Optional[Callable],
+        on_candidate: Optional[Callable],
+        baseline: Optional[CandidateEval],
+        baseline_rejection: Optional[dict],
+    ):
+        self.inputs = inputs
+        self.pop_size = pop_size
+        self.n_gen = n_gen
+        self.seed = seed
+        self.grid_mm = grid_mm
+        self.levels = levels
+        self.workers = workers
+        self.progress = progress
+        self.on_candidate = on_candidate
+        self.candidates = [baseline] if baseline is not None else []
+        self.rejected = [baseline_rejection] if baseline_rejection is not None else []
+        self.index_cache: dict[tuple[int, ...], tuple[Optional[CandidateEval], list, list]] = {}
+        self.next_candidate_number = 1
+        self.search_evaluated = 0
+        self.generation = 0
+        self.executor = None
+        labels = []
+        for label, _, _ in derive_zone_bands(inputs, inputs.flow_axis):
+            if label not in labels:
+                labels.append(label)
+        n_variables = 1 + len(labels)
+        self.n_constraints = _constraint_count(inputs)
+        super().__init__(
+            n_var=n_variables,
+            n_obj=2,
+            n_ieq_constr=self.n_constraints,
+            xl=np.zeros(n_variables, dtype=int),
+            xu=np.full(n_variables, len(levels) - 1, dtype=int),
+            vtype=int,
+        )
+
+    def _candidate_id(self) -> str:
+        cid = f"c{self.next_candidate_number:03d}"
+        self.next_candidate_number += 1
+        return cid
+
+    def _evaluate(self, X, out, *args, **kwargs):
+        X = np.rint(np.asarray(X)).astype(int)
+        rows = [tuple(int(i) for i in row) for row in X]
+        new_rows = []
+        new_seen = set()
+        for key in rows:
+            if key not in self.index_cache and key not in new_seen:
+                new_seen.add(key)
+                new_rows.append((key, self._candidate_id()))
+
+        if new_rows:
+            ids = [cid for _, cid in new_rows]
+            designs, rejected = generate_candidates(
+                self.inputs, [key for key, _ in new_rows], candidate_ids=ids
+            )
+            designs_by_id = {design.design_id: design for design in designs}
+            rejected_by_id = {entry["candidate_id"]: entry for entry in rejected}
+            self.rejected.extend(rejected)
+            pending = []
+            for key, cid in new_rows:
+                if cid in rejected_by_id:
+                    large_g = [1e6] * self.n_constraints
+                    self.index_cache[key] = (None, [1e12, 1e12], large_g)
+                else:
+                    pending.append((key, designs_by_id[cid]))
+
+            def record(key, candidate, constraints):
+                objective = [
+                    candidate.metrics["pressure_drop_kPa"],
+                    candidate.metrics["critical_temperature_C"],
+                ]
+                if len(constraints) != self.n_constraints:
+                    raise RuntimeError(
+                        f"expected {self.n_constraints} constraints, got {len(constraints)}"
+                    )
+                self.index_cache[key] = (candidate, objective, constraints)
+                self.candidates.append(candidate)
+                self.search_evaluated += 1
+                if self.on_candidate:
+                    self.on_candidate(candidate)
+                if self.progress:
+                    planned = self.pop_size * self.n_gen
+                    self.progress(
+                        self.search_evaluated,
+                        planned,
+                        f"evaluated {self.search_evaluated}/{planned}",
+                    )
+
+            if self.executor is None:
+                for key, design in pending:
+                    candidate, constraints = _evaluate_candidate_worker(
+                        self.inputs, design, self.grid_mm
+                    )
+                    record(key, candidate, constraints)
+            else:
+                futures = {
+                    self.executor.submit(
+                        _evaluate_candidate_worker, self.inputs, design, self.grid_mm
+                    ): key
+                    for key, design in pending
+                }
+                for future in as_completed(futures):
+                    candidate, constraints = future.result()
+                    record(futures[future], candidate, constraints)
+
+        objectives = []
+        constraints = []
+        for key in rows:
+            _candidate, objective, g = self.index_cache[key]
+            objectives.append(objective)
+            constraints.append(g)
+        out["F"] = np.asarray(objectives, dtype=float)
+        out["G"] = np.asarray(constraints, dtype=float)
+
+def _nondominated_candidates(candidates: list[CandidateEval]) -> list[CandidateEval]:
+    feasible = [candidate for candidate in candidates if candidate.feasible]
+    front = [
+        candidate for candidate in feasible
+        if not any(
+            other is not candidate
+            and _dominates(
+                (other.metrics["pressure_drop_kPa"], other.metrics["critical_temperature_C"]),
+                (candidate.metrics["pressure_drop_kPa"], candidate.metrics["critical_temperature_C"]),
+            )
+            for other in feasible
+        )
+    ]
+    return sorted(
+        front,
+        key=lambda candidate: (
+            candidate.metrics["pressure_drop_kPa"], candidate.candidate_id
+        ),
+    )
+
+
+class _GenerationCallback(Callback):
+    def __init__(
+        self,
+        problem: _OptimizationProblem,
+        callback: Optional[Callable],
+        n_gen: int,
+    ):
+        super().__init__()
+        self.problem = problem
+        self.callback = callback
+        self.n_gen = n_gen
+
+    def notify(self, algorithm):
+        if self.callback is None:
+            return
+        front = _nondominated_candidates(self.problem.candidates)
+        self.callback(
+            algorithm.n_gen,
+            self.n_gen,
+            len(self.problem.candidates),
+            [candidate.candidate_id for candidate in front],
+        )
+
+
+def run_optimization(
+    inputs: EngineInputs,
+    *,
+    pop_size: int = 24,
+    n_gen: int = 8,
+    seed: int = 42,
+    grid_mm: float = 0.5,
+    workers: Optional[int] = None,
+    progress: Optional[Callable] = None,
+    on_candidate: Optional[Callable] = None,
+    on_generation: Optional[Callable] = None,
+) -> OptimizationResult:
+    """Run integer NSGA-II; progress excludes the separately evaluated baseline.
+
+    The progress denominator is the planned population budget ``pop_size*n_gen``.
+    Duplicate genotypes and geometry rejections can make actual simulations fewer.
+    """
+    if pop_size < 2:
+        raise ValueError("pop_size must be at least 2")
+    if n_gen < 1:
+        raise ValueError("n_gen must be at least 1")
+    if workers is not None and workers < 1:
+        raise ValueError("workers must be positive")
+
+    assumptions: list[str] = []
+    levels = _levels(inputs, assumptions)
+    baseline = baseline_design(inputs)
+    baseline_candidate = None
+    baseline_rejection = None
+    try:
+        build_layout(inputs, baseline)
+    except GeometryError as exc:
+        baseline_rejection = {
+            "candidate_id": "c000",
+            "params": {"baseline": True},
+            "reason": str(exc),
         }
-        for c in ev_wc.thermal.components:
-            lim = (inputs.limits_C or {}).get(c["type"])
-            if lim is not None and c["max_C"] + d_in > lim:
-                wc["failures"].append(
-                    {"component": c["name"], "max_C": c["max_C"] + d_in, "limit_C": lim}
-                )
-        wc["margin_ok"] = not wc["failures"]
-        tgts = {}
-        for c in ev.thermal.components:
-            t_lim = (inputs.targets_C or {}).get(c["type"])
-            if t_lim is not None:
-                tgts[c["name"]] = c["max_C"] <= t_lim
-        cands.append(CandidateEval(
-            candidate_id=des.design_id, design=des,
-            params=_params(inputs, des),
-            metrics=_metrics(inputs, ev, crit_type),
-            feasible=not viol, violations=viol, targets_met=tgts,
-            worst_case=wc, nominal_eval=ev,
-        ))
-        if progress:
-            progress(k + 1, len(designs), f"evaluated {k + 1}/{len(designs)}")
+    else:
+        baseline_candidate, _ = _evaluate_candidate_worker(inputs, baseline, grid_mm)
+        baseline_candidate.candidate_id = "c000"
         if on_candidate:
-            on_candidate(cands[-1])
+            on_candidate(baseline_candidate)
 
-    feas = [c for c in cands if c.feasible]
+    context = _OptimizationProblem(
+        inputs,
+        pop_size=pop_size,
+        n_gen=n_gen,
+        seed=seed,
+        grid_mm=grid_mm,
+        levels=levels,
+        workers=workers or min(8, os.cpu_count() or 1),
+        progress=progress,
+        on_candidate=on_candidate,
+        baseline=baseline_candidate,
+        baseline_rejection=baseline_rejection,
+    )
+    if workers != 1:
+        context.executor = ProcessPoolExecutor(max_workers=context.workers)
+    algorithm = NSGA2(
+        pop_size=pop_size,
+        sampling=IntegerRandomSampling(),
+        crossover=SBX(prob=0.9, eta=15, vtype=float, repair=RoundingRepair()),
+        mutation=PM(eta=20, vtype=float, repair=RoundingRepair()),
+        eliminate_duplicates=True,
+    )
+    try:
+        minimize(
+            context,
+            algorithm,
+            termination=("n_gen", n_gen),
+            seed=seed,
+            verbose=False,
+            save_history=False,
+            copy_algorithm=False,
+            callback=_GenerationCallback(context, on_generation, n_gen),
+        )
+    finally:
+        if context.executor is not None:
+            context.executor.shutdown(wait=True)
+
+    cands = sorted(
+        context.candidates, key=lambda candidate: int(candidate.candidate_id[1:])
+    )
+    rejected = sorted(
+        context.rejected, key=lambda item: int(item["candidate_id"][1:])
+    )
+    crit_type = inputs.critical_type
+    feas = [candidate for candidate in cands if candidate.feasible]
     xy = [(c.metrics["pressure_drop_kPa"], c.metrics["critical_temperature_C"]) for c in feas]
-    nd = [i for i in range(len(feas))
-          if not any(i != j and _dominates(xy[j], xy[i]) for j in range(len(feas)))]
-    for i in nd:
+    front = [i for i in range(len(feas))
+             if not any(i != j and _dominates(xy[j], xy[i]) for j in range(len(feas)))]
+    for i in front:
         feas[i].nondominated = True
-    # fast nondominated-sort ranks among feasible
-    cur = [i for i in range(len(feas))]
     rank = 0
-    remaining = set(cur)
+    remaining = set(range(len(feas)))
     while remaining:
         front = [i for i in remaining
                  if not any(j != i and j in remaining and _dominates(xy[j], xy[i])
@@ -294,15 +547,21 @@ def run_optimization(
             "nondominated" if c.nondominated
             else ("dominated" if c.feasible else "infeasible")
         )
-    front_ids = [c.candidate_id for c in sorted(
-        (c for c in cands if c.nondominated),
-        key=lambda c: c.metrics["pressure_drop_kPa"])]
+    front_ids = [candidate.candidate_id for candidate in _nondominated_candidates(cands)]
     return OptimizationResult(
         candidates=cands, rejected=rejected,
         n_evaluated=len(cands), n_feasible=len(feas),
-        n_nondominated=len(nd), front_candidate_ids=front_ids,
+        n_nondominated=len(front_ids), front_candidate_ids=front_ids,
         all_infeasible=not feas, critical_type=crit_type, seed=seed,
         warnings=assumptions,
+        algorithm={
+            "name": f"NSGA-II (pymoo {pymoo.__version__})",
+            "pop_size": pop_size,
+            "n_gen": n_gen,
+            "seed": seed,
+            "n_evaluated": len(cands),
+            "n_geometry_rejected": len(rejected),
+        },
     )
 
 
@@ -331,90 +590,43 @@ def _params(inputs: EngineInputs, des: ChannelDesign) -> dict:
 
 
 def select_designs(result: OptimizationResult) -> list:
-    """Five designs: pressure/cooling focused, knee, leanings, then fills."""
-    feas = [c for c in result.candidates if c.nondominated]
-    picked: list = []
-    if feas:
-        xs = np.array([c.metrics["pressure_drop_kPa"] for c in feas])
-        ys = np.array([c.metrics["critical_temperature_C"] for c in feas])
-        xr = max(xs.max() - xs.min(), 1e-9)
-        yr = max(ys.max() - ys.min(), 1e-9)
-        order = np.argsort(xs)
-        feas_s = [feas[i] for i in order]
-        xn = (xs[order] - xs.min()) / xr
-        yn = (ys[order] - ys.min()) / yr
+    """Pick pressure, cooling and utopia-knee designs from the feasible front."""
+    front = _nondominated_candidates(result.candidates)
+    for candidate in result.candidates:
+        candidate.selected = False
+        candidate.role = None
+    if not front:
+        return []
 
-        def take(c, role):
-            if c in picked:
-                return c
-            c.selected = True
-            c.role = role
-            picked.append(c)
-            return c
+    pressure = min(
+        front,
+        key=lambda c: (c.metrics["pressure_drop_kPa"], c.candidate_id),
+    )
+    cooling = min(
+        front,
+        key=lambda c: (c.metrics["critical_temperature_C"], c.candidate_id),
+    )
+    xs = np.array([c.metrics["pressure_drop_kPa"] for c in front], dtype=float)
+    ys = np.array([c.metrics["critical_temperature_C"] for c in front], dtype=float)
+    xn = (xs - xs.min()) / max(xs.max() - xs.min(), 1e-9)
+    yn = (ys - ys.min()) / max(ys.max() - ys.min(), 1e-9)
+    balanced = front[int(np.argmin(np.sqrt(xn**2 + yn**2)))]
 
-        pf = take(feas_s[0], "pressure_focused")
-        if len(feas_s) > 1:
-            cf = take(feas_s[-1], "cooling_focused")
-        if len(feas_s) > 2:
-            d_ut = np.sqrt(xn**2 + yn**2)
-            knee_i = int(np.argmin(d_ut))
-            # skip near-duplicates of already-picked
-            def is_dup(i):
-                return any(
-                    abs(xn[i] - xn[j]) < 0.01 and abs(yn[i] - yn[j]) < 0.01
-                    for j in [feas_s.index(p) for p in picked if p in feas_s]
-                )
-            while knee_i < len(feas_s) and is_dup(knee_i):
-                d_ut[knee_i] = np.inf
-                knee_i = int(np.argmin(d_ut))
-            bal = take(feas_s[knee_i], "balanced")
-            # arc-length midpoints pf->bal and bal->cf along the front
-            bi = feas_s.index(bal)
-            seg1 = feas_s[:bi + 1]
-            seg2 = feas_s[bi:]
-            def mid_of(seg):
-                if len(seg) < 2:
-                    return seg[0]
-                idx = [feas_s.index(c) for c in seg]
-                pts = np.column_stack([xn[idx], yn[idx]])
-                seglen = np.cumsum(np.r_[0.0, np.linalg.norm(np.diff(pts, axis=0), axis=1)])
-                target = seglen[-1] / 2.0
-                return seg[int(np.argmin(np.abs(seglen - target)))]
-            for seg, role in ((seg1, "pressure_leaning"), (seg2, "cooling_leaning")):
-                cand = mid_of(seg)
-                if cand in picked:
-                    # nearest unpicked along segment
-                    alts = [c for c in seg if c not in picked]
-                    cand = alts[0] if alts else cand
-                if cand not in picked:
-                    take(cand, role)
-    # fill from dominated feasible (by rank then distance to front), then infeasible
-    if len(picked) < 5:
-        dom = [c for c in result.candidates if c.feasible and not c.selected]
-        dom.sort(key=lambda c: (c.rank, c.metrics["pressure_drop_kPa"]))
-        for c in dom:
-            if len(picked) >= 5:
-                break
-            c.selected = True
-            c.role = "dominated"
-            picked.append(c)
-    if len(picked) < 5:
-        infeas = [c for c in result.candidates if not c.feasible and not c.selected]
-        def viol_sum(c):
-            tot = 0.0
-            for v in c.violations:
-                lim = v["limit"] or 1.0
-                tot += (v["value"] - lim) / lim
-            return tot
-        infeas.sort(key=viol_sum)
-        for c in infeas:
-            if len(picked) >= 5:
-                break
-            c.selected = True
-            c.role = "infeasible"
-            picked.append(c)
-    picked.sort(key=lambda c: c.metrics["pressure_drop_kPa"])
-    return picked[:5]
+    role_picks = (
+        (pressure, "pressure_focused"),
+        (cooling, "cooling_focused"),
+        (balanced, "balanced"),
+    )
+    picked = []
+    for candidate, role in role_picks:
+        if candidate not in picked:
+            candidate.selected = True
+            candidate.role = role
+            picked.append(candidate)
+    return sorted(
+        picked,
+        key=lambda c: (c.metrics["pressure_drop_kPa"], c.candidate_id),
+    )
 
 
 def sweep_design(inputs: EngineInputs, design: ChannelDesign, grid_mm: float = 0.5) -> dict:
