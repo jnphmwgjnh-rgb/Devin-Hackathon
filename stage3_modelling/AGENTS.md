@@ -8,7 +8,7 @@ Python 3.12 engine + React/TS Pareto harness. Branch `feat/coldplate-engine`.
 - Tests (offline): `../.venv/Scripts/python.exe -m pytest -q`
 - Live e2e (spends Devin quota): `../.venv/Scripts/python.exe -m pytest -m live tests/test_e2e_live.py`
 - API: `../.venv/Scripts/python.exe -m uvicorn coldplate.api:app --port 8000`
-- Demo: `../.venv/Scripts/python.exe scripts/run_demo.py --parser recorded`
+- App: `../.venv/bin/python run_app.py` from the repository root
 - Frontend: `cd stage3_modelling/frontend && npm ci && npm run dev|build|test`
 - Results schema: `../.venv/Scripts/python.exe scripts/export_results_schema.py`
 

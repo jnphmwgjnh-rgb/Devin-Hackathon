@@ -1,15 +1,19 @@
-# Build from the repo root: docker build -f deploy/Dockerfile -t coldshock-demo .
-FROM python:3.11-slim
+FROM node:20-slim AS landing
+WORKDIR /build/landing
+COPY landing/package.json landing/package-lock.json ./
+RUN npm ci
+COPY landing/ ./
+RUN npm run build
+
+FROM python:3.12-slim
 WORKDIR /srv
-COPY deploy/requirements.txt deploy/requirements.txt
-RUN pip install --no-cache-dir -r deploy/requirements.txt
+COPY stage3_modelling/pyproject.toml stage3_modelling/pyproject.toml
+COPY stage3_modelling/coldplate stage3_modelling/coldplate
+RUN pip install --no-cache-dir -e ./stage3_modelling
 COPY cfd-dashboard/backend cfd-dashboard/backend
 COPY cfd-dashboard/frontend cfd-dashboard/frontend
-COPY stage1_intake stage1_intake
-COPY stage2_optimizer stage2_optimizer
-COPY stage3_modelling/coldplate stage3_modelling/coldplate
-COPY stage3_modelling/demo stage3_modelling/demo
+COPY --from=landing /build/landing/dist landing/dist
 COPY deploy/server.py deploy/server.py
-ENV PORT=8080 DEMO=true LLM_PROVIDER=mock PYTHONUNBUFFERED=1
+ENV PORT=8080 PYTHONUNBUFFERED=1
 EXPOSE 8080
 CMD ["python", "deploy/server.py"]

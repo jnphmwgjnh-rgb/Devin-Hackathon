@@ -135,7 +135,7 @@ Then open <http://localhost:8000> locally. The frontend loads Plotly and three.j
 | --- | --- |
 | `GET /api/runs` | Runs sorted by index and campaign summary |
 | `GET /api/runs/{id}` | Run details and residual history (at most 500 points) |
-| `GET /api/runs/{id}/geometry` | STL geometry, if present |
+| `GET /api/runs/{candidate_id}/cad?format=step\|stl\|glb` | Candidate CAD export, when available |
 | `WS /ws` | Initial snapshot, then run/summary updates; completion and failure events |
 
 WebSocket event types are `snapshot`, `run_updated`, `run_completed` (includes `joined_pareto`), and `run_failed`. Pareto membership is calculated from completed runs with both objective metrics.

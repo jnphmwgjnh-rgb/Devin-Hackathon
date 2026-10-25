@@ -251,7 +251,11 @@ def render_group(digest):
         return f'{digest.get("summary", "")}\n\nIs this correct?'
     group_number = digest.get("next_group")
     group_name = digest.get("next_group_name")
-    lines = [f"Group {group_number}: {group_name}"]
+    lines = (
+        [f"Group {group_number}: {group_name}"]
+        if group_number is not None and group_name is not None
+        else []
+    )
     for item in digest.get("next_group_fields", []):
         display = item.get("value_display", "MISSING")
         if item.get("status") == "missing":

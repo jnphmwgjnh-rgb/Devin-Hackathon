@@ -1,46 +1,42 @@
-# Cold-plate demo stack
+# ColdShock AI cold-plate design tool
 
-Three stages + a dashboard:
-- `stage1_intake/` — Gradio chat (:7860) that finalizes requirements.
-- `stage2_optimizer/` — teammate optimizer (kept as is).
-- `stage3_modelling/` — this repo's reduced-order engine (Devin parse ->
-  normalized inputs -> channel designs -> thermal/hydraulic -> Pareto).
-- `cfd-dashboard/` — run/Pareto dashboard (:8000); also ingests stage-3 runs.
+This repository contains a cold-plate intake flow, a discrete NSGA-II design
+search, a reduced-order thermal/hydraulic model, CAD export, a landing page, and
+a candidate dashboard. The thermal results are estimates from a **reduced-order
+model (2-D conjugate conduction + duct-flow ΔP), not CFD**. They are not
+validated 3-D CFD predictions.
 
-## Demo (one command)
+## Run locally
 
-PowerShell or Git Bash:
+From the repository root, run:
 
-    python run_demo_stack.py
-
-DEMO=true (default) replays a real recorded run into the dashboard in ~10 s;
-DEMO=false runs the live engine (uses Devin quota).
-
-## Components
-
-- stage3 engine docs: `stage3_modelling/README.md` (paths updated for the move).
-- Engine results contract: `stage3_modelling/docs/API_CONTRACT.md`.
-
-## Run the full demo locally (landing → chat → dashboard)
-
-Two PowerShell terminals, both started from the repository root. DEMO=true (the default) replays a precomputed real run in about 10 s, with a visible "Demo replay" tag; DEMO=false runs the real pipeline.
-
-Terminal 1 (chat at http://127.0.0.1:8080/chat/, dashboard at http://127.0.0.1:8080/):
-```
-$env:GOOGLE_API_KEY="<your Gemini key>"; $env:GEMINI_API_KEY=$env:GOOGLE_API_KEY; $env:LLM_PROVIDER="gemini"; $env:DEMO="true"; $env:PORT="8080"; .venv\Scripts\python.exe deploy\server.py
-```
-Use `$env:LLM_PROVIDER="mock"` to run without a Gemini key. If a machine-wide `GOOGLE_API_KEY` exists, the Gemini SDK prefers it, so set it to the same key as above.
-
-Terminal 2 (landing page at http://127.0.0.1:5500); the first time only, build it:
-```
-cd landing; npm ci; $env:VITE_CHAT_URL="http://127.0.0.1:8080/chat/"; npm run build:standalone; cd ..
-mkdir runs_landing -Force; copy landing\dist-standalone\standalone.html runs_landing\index.html
-.venv\Scripts\python.exe -m http.server 5500 --bind 127.0.0.1 --directory runs_landing
+```bash
+./.venv/bin/python run_app.py
 ```
 
-Walkthrough:
-1. Open http://127.0.0.1:5500 and click **Start a design**.
-2. In the chat, click **Load ITherm 2027 preset** (or upload a `.md` / `.pptx`) and answer `yes` to each group.
-3. Click **Open modelling dashboard** and watch the Pareto front fill in.
+The launcher builds the landing page when `npm` is available and `landing/dist`
+does not exist, then serves the app on `http://127.0.0.1:8080`. Open `/` for
+the landing page, `/intake` to provide requirements, and `/dashboard` to view
+the candidate search. If the landing page has not been built and npm is absent,
+`/` redirects to intake.
 
-CAD (STEP/STL/GLB) is exported only for the 5 selected designs, shown as diamonds on the plot. Other candidates show metrics only.
+The **Use another AI** intake path requires no API key: copy the prompt, attach
+one diagram or paste one requirements document into an external chat model, and
+paste its single JSON block back into the app. The optional built-in text parser
+uses the existing Devin parser and is disabled unless `DEVIN_API_KEY` is
+configured in the server environment. Tests do not make live Devin calls.
+
+## Model scope
+
+The engine searches integer-indexed fin/channel geometry candidates with
+NSGA-II, computes thermal and pressure-drop estimates, identifies the feasible
+Pareto front, and exports STEP/STL/GLB for nondominated designs. It does not
+mesh geometry or run a CFD solver. CAD export errors are recorded per design;
+the dashboard only offers CAD for designs that were exported.
+
+The landing-page Pareto chart is generated from the recorded A_canonical
+reference package using the default optimizer settings. It is an actual engine
+run, not a replay or placeholder chart.
+
+See [stage3_modelling/docs/API_CONTRACT.md](stage3_modelling/docs/API_CONTRACT.md)
+for the engine results and dashboard API contracts.

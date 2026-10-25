@@ -89,6 +89,17 @@ def test_mock_group_prompt_separates_confirmation_from_bullet_list():
     )
 
 
+def test_render_group_omits_header_when_group_is_unavailable():
+    text = llm.render_group({
+        "next_group": None,
+        "next_group_name": None,
+        "next_group_fields": [{"label": "Flow rate", "value_display": "2 L/min"}],
+    })
+
+    assert "Group None: None" not in text
+    assert "- Flow rate: 2 L/min" in text
+
+
 def test_gemini_retries_transient_error_with_injectable_backoff(monkeypatch):
     provider, models, sleeps, _ = _provider(
         monkeypatch,
