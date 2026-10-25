@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cold-plate requirements intake</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0d1117;--panel:#151c24;--line:#303b48;--text:#e6edf3;--muted:#aeb9c7;--cyan:#67e8f9;--orange:#fb923c;--red:#ffb4ae}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,sans-serif}
+    header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px max(20px,calc((100% - 1050px)/2));border-bottom:1px solid var(--line)}
+    h1,h2,h3,p{margin-top:0}h1{font-size:clamp(1.5rem,4vw,2.1rem);margin-bottom:4px}.sub{color:var(--muted);margin:0}
+    nav{display:flex;gap:16px}a{color:var(--cyan)}nav a{font-weight:650;text-decoration:none}
+    .disclosure{margin:0;padding:8px max(20px,calc((100% - 1050px)/2));background:#111923;border-bottom:1px solid var(--line);font-size:12px;font-weight:650}
+    main{max-width:1050px;margin:32px auto;padding:0 20px 48px}.panel{padding:22px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+    .tabs{display:flex;gap:8px;border-bottom:1px solid var(--line);margin-bottom:22px}
+    button,.button{font:inherit;font-weight:650;border:1px solid #526071;border-radius:7px;background:#202a35;color:var(--text);padding:9px 14px;cursor:pointer}
+    button:hover,.button:hover{border-color:var(--cyan)}button[aria-selected=true]{border-color:var(--cyan);color:var(--cyan);background:#10242a}
+    button:disabled{cursor:not-allowed;opacity:.55} :focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+    label{display:block;font-size:13px;font-weight:650;margin:14px 0 6px}
+    textarea,input{width:100%;font:inherit;color:var(--text);background:#0d131a;border:1px solid #526071;border-radius:7px;padding:10px}
+    textarea{min-height:150px;resize:vertical}textarea[readonly]{min-height:280px;font:12px/1.45 ui-monospace,monospace}
+    input[type=file]{border:0;padding:8px 0}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:0 0 auto}
+    .muted{color:var(--muted);font-size:13px}.orange{color:var(--orange)}.hidden{display:none!important}
+    .result{margin-top:22px}.error-list{padding:14px 18px;border:1px solid #7c3333;border-radius:8px;background:#291719;color:#ffd7d4}
+    .notice{padding:12px 14px;border-left:3px solid var(--orange);background:#241c15;color:#ffe3c5;margin:12px 0}
+    .summary{width:100%;border-collapse:collapse;margin-top:12px}.summary th,.summary td{padding:9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.summary th{color:var(--muted);font-size:12px}
+    .summary td{overflow-wrap:anywhere}.summary .evidence{color:var(--muted);font-size:12px}
+    .question{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:8px}
+    .field-grid{display:grid;grid-template-columns:minmax(140px,1fr) minmax(150px,2fr) minmax(90px,1fr);gap:10px;align-items:end}
+    .status{min-height:1.5em;margin-top:12px;color:var(--muted)}.status[role=alert]{color:var(--red)}.next{background:var(--cyan);color:#06121a;border-color:var(--cyan)}
+    @media(max-width:650px){header{align-items:flex-start;flex-direction:column}.panel{padding:16px}.field-grid{grid-template-columns:1fr}.summary{font-size:13px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Cold-plate requirements</h1><p class="sub">Provide one text document or extract one diagram with another AI.</p></div>
+    <nav aria-label="Primary"><a href="/intake" aria-current="page">Intake</a><a href="/dashboard">Dashboard</a></nav>
+  </header>
+  <p class="disclosure">Reduced-order model (2-D conjugate conduction + duct-flow ΔP), not CFD</p>
+  <main>
+    <section class="panel" aria-labelledby="intake-heading">
+      <h2 id="intake-heading">Choose an input path</h2>
+      <div class="tabs" role="tablist" aria-label="Input method">
+        <button id="tab-builtin" role="tab" aria-selected="true" aria-controls="panel-builtin">Built-in parser</button>
+        <button id="tab-external" role="tab" aria-selected="false" aria-controls="panel-external">Use another AI</button>
+      </div>
+      <div id="panel-builtin" role="tabpanel" aria-labelledby="tab-builtin">
+        <p id="builtin-reason" class="notice hidden"></p>
+        <label for="builtin-text">Paste the requirements text</label>
+        <textarea id="builtin-text" placeholder="Paste one cold-plate requirements document"></textarea>
+        <label for="builtin-file">Or load a .md or .txt file</label>
+        <input id="builtin-file" type="file" accept=".md,.txt,text/plain,text/markdown" />
+        <button id="builtin-submit">Parse text and check requirements</button>
+      </div>
+      <div id="panel-external" role="tabpanel" aria-labelledby="tab-external" class="hidden">
+        <h3>Step 1 · Ask your AI to extract the diagram or text</h3>
+        <p>Attach your diagram (PNG, JPG, or PDF) or paste your text into ChatGPT, Claude, Gemini, or another chat LLM together with this prompt.</p>
+        <label for="prompt">Extraction prompt</label>
+        <textarea id="prompt" readonly></textarea>
+        <div class="row"><button id="copy-prompt">Copy prompt</button><span id="copy-status" class="muted" role="status"></span></div>
+        <h3 style="margin-top:24px">Step 2 · Paste the JSON reply</h3>
+        <label for="external-json">AI reply</label>
+        <textarea id="external-json" placeholder="Paste the reply, including its single fenced JSON block"></textarea>
+        <label for="source-name">Optional diagram or document file name</label>
+        <input id="source-name" type="text" autocomplete="off" placeholder="e.g. package-layout.pdf" />
+        <button id="external-submit" style="margin-top:14px">Validate and check requirements</button>
+      </div>
+      <div id="result" class="result" aria-live="polite"></div>
+      <p id="status" class="status" role="status"></p>
+    </section>
+  </main>
+  <script type="module" src="/intake.js"></script>
+</body>
+</html>

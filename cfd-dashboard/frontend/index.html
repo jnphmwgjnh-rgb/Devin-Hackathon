@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CFD Optimization Monitor</title>
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <title>Cold-plate design dashboard</title>
+  <link rel="stylesheet" href="styles.css?v=8" />
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
   <script type="importmap">
     {
@@ -20,11 +20,15 @@
     <div class="brand">
       <span class="logo">&#9672;</span>
       <div>
-        <h1>CFD Optimization Monitor</h1>
-        <p class="subtitle">Chip heat-sink design &middot; minimize pressure drop &amp; max temperature</p>
+        <h1>Cold-plate design dashboard</h1>
+        <p class="subtitle">Candidate search &middot; pressure drop and component temperature</p>
       </div>
     </div>
     <div class="topbar-actions">
+      <nav class="primary-nav" aria-label="Primary">
+        <a href="/intake">Intake</a>
+        <a href="/dashboard" aria-current="page">Dashboard</a>
+      </nav>
       <label class="select-label">Ping me for
         <select id="notify-mode">
           <option value="pareto">new Pareto designs</option>
@@ -36,6 +40,7 @@
       <span id="conn" class="conn conn-down" title="Live connection"><span class="dot"></span><span class="conn-text">Connecting…</span></span>
     </div>
   </header>
+  <p class="model-disclosure">Reduced-order model (2-D conjugate conduction + duct-flow ΔP), not CFD</p>
 <div id="campaign-bar" class="campaign-bar hidden">
   <span id="campaign-mode" class="campaign-tag"></span>
   <span id="campaign-stage" class="campaign-stage"></span>
@@ -67,20 +72,12 @@
           <span class="hint">Click a point for details</span>
         </div>
         <div id="pareto-plot" class="plot"></div>
-        <div id="campaign-overlay" class="campaign-overlay hidden"><ol id="campaign-steps" class="campaign-steps"></ol></div>
       </div>
 
       <div class="side">
         <div class="card">
           <div class="card-head"><h2>Running now</h2></div>
           <div id="running-list" class="running-list"><p class="empty">No runs in progress.</p></div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <h2>Live residuals</h2>
-            <span class="hint" id="live-run-label"></span>
-          </div>
-          <div id="live-residuals" class="plot plot-small"></div>
         </div>
         <div class="card">
           <div class="card-head"><h2>Activity</h2></div>
@@ -109,7 +106,7 @@
               <th class="num">Inlet v [m/s]</th><th class="num">Runtime</th>
             </tr>
           </thead>
-          <tbody id="runs-body"><tr><td colspan="9" class="empty">Waiting for a modelling campaign — finalize requirements in the chat and click Open modelling dashboard.</td></tr></tbody>
+          <tbody id="runs-body"><tr><td colspan="9" class="empty">No candidate runs yet. <a href="/intake">Start a cold-plate design</a>.</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -131,10 +128,15 @@
           <button class="btn btn-ghost" data-close type="button" title="Close (Esc)">&times;</button>
         </div>
       </div>
+      <p class="model-disclosure">Reduced-order model (2-D conjugate conduction + duct-flow ΔP), not CFD</p>
       <div class="modal-body">
         <div class="viewer-wrap">
           <div id="viewer" class="viewer"></div>
-          <a id="modal-download" class="btn" style="display:none;position:relative;z-index:5;clear:both;margin:16px 0 8px;padding:8px 16px;background:#67e8f9;color:#020617;border-radius:6px;font-weight:600;text-decoration:none" href="#">Download CAD (STL)</a>
+          <div class="cad-downloads hidden" id="cad-downloads">
+            <span id="modal-design-id"></span>
+            <a id="download-step" class="btn" href="#">Download STEP</a>
+            <a id="download-stl" class="btn" href="#">Download STL</a>
+          </div>
           <div class="viewer-hint">Drag to rotate &middot; scroll to zoom &middot; right-drag to pan</div>
         </div>
         <div class="details">
@@ -147,13 +149,9 @@
           <table class="kv" id="modal-solver"></table>
         </div>
       </div>
-      <div class="modal-residuals">
-        <h3>Convergence (initial residuals)</h3>
-        <div id="modal-residual-plot" class="plot plot-small"></div>
-      </div>
     </div>
   </div>
 
-  <script type="module" src="app.js?v=7"></script>
+  <script type="module" src="app.js?v=8"></script>
 </body>
 </html>

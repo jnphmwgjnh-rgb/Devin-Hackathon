@@ -1,0 +1,1365 @@
+{
+  "algorithm": {
+    "name": "NSGA-II (pymoo 0.6.1.6)",
+    "pop_size": 24,
+    "n_gen": 8,
+    "seed": 42,
+    "n_evaluated": 166,
+    "n_geometry_rejected": 0
+  },
+  "n_evaluated": 166,
+  "front_candidate_ids": [
+    "c155",
+    "c162",
+    "c104",
+    "c001",
+    "c099",
+    "c147",
+    "c161",
+    "c113",
+    "c077",
+    "c135",
+    "c072",
+    "c131",
+    "c007",
+    "c084",
+    "c044",
+    "c164",
+    "c061",
+    "c151",
+    "c094",
+    "c157",
+    "c142",
+    "c087"
+  ],
+  "candidates": [
+    {
+      "candidate_id": "c000",
+      "pressure_drop_kPa": 0.9144519337143923,
+      "critical_temperature_C": 56.65710692985509,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c001",
+      "pressure_drop_kPa": 0.3573699494432131,
+      "critical_temperature_C": 60.473851952934126,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c002",
+      "pressure_drop_kPa": 0.5806858342773388,
+      "critical_temperature_C": 63.876073366525766,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c003",
+      "pressure_drop_kPa": 0.8035144772567124,
+      "critical_temperature_C": 60.550645330163164,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c004",
+      "pressure_drop_kPa": 1.0379484886271575,
+      "critical_temperature_C": 62.60897641714945,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c005",
+      "pressure_drop_kPa": 1.047198554670862,
+      "critical_temperature_C": 54.780211657320855,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c006",
+      "pressure_drop_kPa": 1.2987647192425145,
+      "critical_temperature_C": 57.893553720292296,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c007",
+      "pressure_drop_kPa": 0.5949883781000641,
+      "critical_temperature_C": 55.25039286660273,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c008",
+      "pressure_drop_kPa": 5.583070590850406,
+      "critical_temperature_C": 54.843928209074136,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c009",
+      "pressure_drop_kPa": 1.1461705703239944,
+      "critical_temperature_C": 65.00987371032326,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c010",
+      "pressure_drop_kPa": 1.08544375257808,
+      "critical_temperature_C": 55.13537518001691,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c011",
+      "pressure_drop_kPa": 0.48498418583309644,
+      "critical_temperature_C": 62.537680658854235,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c012",
+      "pressure_drop_kPa": 1.4057783475892323,
+      "critical_temperature_C": 70.69073030280266,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c013",
+      "pressure_drop_kPa": 0.49952387777401974,
+      "critical_temperature_C": 65.67583749592295,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c014",
+      "pressure_drop_kPa": 0.6142535969095195,
+      "critical_temperature_C": 62.79624305171079,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c015",
+      "pressure_drop_kPa": 1.9234918868280755,
+      "critical_temperature_C": 55.320277424668376,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c016",
+      "pressure_drop_kPa": 0.5749838165511033,
+      "critical_temperature_C": 65.70352076037253,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c017",
+      "pressure_drop_kPa": 1.9834967277180426,
+      "critical_temperature_C": 55.30483083631403,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c018",
+      "pressure_drop_kPa": 0.7670523993295479,
+      "critical_temperature_C": 56.847236321648474,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c019",
+      "pressure_drop_kPa": 0.5749838165511033,
+      "critical_temperature_C": 65.70352076037253,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c020",
+      "pressure_drop_kPa": 1.412083043048666,
+      "critical_temperature_C": 54.296974213548694,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c021",
+      "pressure_drop_kPa": 12.096827450202456,
+      "critical_temperature_C": 49.33529355176829,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c022",
+      "pressure_drop_kPa": 0.5837854108805118,
+      "critical_temperature_C": 59.610353040612274,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c023",
+      "pressure_drop_kPa": 0.44448492423402086,
+      "critical_temperature_C": 60.0819596409473,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c024",
+      "pressure_drop_kPa": 1.411608942402943,
+      "critical_temperature_C": 67.331378496917,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c025",
+      "pressure_drop_kPa": 0.9328228025252938,
+      "critical_temperature_C": 79.87743455346872,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c026",
+      "pressure_drop_kPa": 1.0558527447911448,
+      "critical_temperature_C": 70.65156121550307,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c027",
+      "pressure_drop_kPa": 1.0038815603076496,
+      "critical_temperature_C": 53.879382025421634,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c028",
+      "pressure_drop_kPa": 0.7731843965641334,
+      "critical_temperature_C": 54.71616857666072,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c029",
+      "pressure_drop_kPa": 1.1463225493304703,
+      "critical_temperature_C": 55.375521034081814,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c030",
+      "pressure_drop_kPa": 1.595552337543811,
+      "critical_temperature_C": 68.31881834322827,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c031",
+      "pressure_drop_kPa": 1.8246314656453724,
+      "critical_temperature_C": 56.43889882566504,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c032",
+      "pressure_drop_kPa": 2.6851173564333766,
+      "critical_temperature_C": 53.42855297772853,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c033",
+      "pressure_drop_kPa": 0.5635745524299379,
+      "critical_temperature_C": 62.27567431500468,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c034",
+      "pressure_drop_kPa": 1.8401667687742067,
+      "critical_temperature_C": 54.83348070977658,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c035",
+      "pressure_drop_kPa": 0.3822602882597771,
+      "critical_temperature_C": 61.030417144872395,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c036",
+      "pressure_drop_kPa": 1.0760352703830547,
+      "critical_temperature_C": 80.12990051354066,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c037",
+      "pressure_drop_kPa": 1.2369693498523788,
+      "critical_temperature_C": 53.98062013609339,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c038",
+      "pressure_drop_kPa": 2.0086786649066655,
+      "critical_temperature_C": 57.51525380706295,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c039",
+      "pressure_drop_kPa": 1.6571513788577588,
+      "critical_temperature_C": 56.27310491066518,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c040",
+      "pressure_drop_kPa": 0.9902645953142495,
+      "critical_temperature_C": 55.45956953550494,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c041",
+      "pressure_drop_kPa": 0.6404349231225568,
+      "critical_temperature_C": 63.28985806344955,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c042",
+      "pressure_drop_kPa": 1.4255712718419669,
+      "critical_temperature_C": 58.784139004571614,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c043",
+      "pressure_drop_kPa": 0.759910981875531,
+      "critical_temperature_C": 59.98309974052137,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c044",
+      "pressure_drop_kPa": 0.8086501825240414,
+      "critical_temperature_C": 54.234471274391495,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c045",
+      "pressure_drop_kPa": 4.2139159060266715,
+      "critical_temperature_C": 57.8951259914253,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c046",
+      "pressure_drop_kPa": 0.6551986134887167,
+      "critical_temperature_C": 62.24000940535096,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c047",
+      "pressure_drop_kPa": 0.5513799915842295,
+      "critical_temperature_C": 64.19154330879645,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c048",
+      "pressure_drop_kPa": 0.6121259028304156,
+      "critical_temperature_C": 64.36949398837682,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c049",
+      "pressure_drop_kPa": 0.8788822196867859,
+      "critical_temperature_C": 55.18455928756243,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c050",
+      "pressure_drop_kPa": 0.49394504098228087,
+      "critical_temperature_C": 60.559639290062265,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c051",
+      "pressure_drop_kPa": 10.87776529192551,
+      "critical_temperature_C": 49.08177960141935,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c052",
+      "pressure_drop_kPa": 0.4443633684722266,
+      "critical_temperature_C": 62.01951269583964,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c053",
+      "pressure_drop_kPa": 1.2632175531937078,
+      "critical_temperature_C": 55.41818912660975,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c054",
+      "pressure_drop_kPa": 0.8804483857206148,
+      "critical_temperature_C": 53.775996105477674,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c055",
+      "pressure_drop_kPa": 0.9457267443433953,
+      "critical_temperature_C": 53.35200428754474,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c056",
+      "pressure_drop_kPa": 0.7447817438417761,
+      "critical_temperature_C": 59.889611637349134,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c057",
+      "pressure_drop_kPa": 1.2831840725750325,
+      "critical_temperature_C": 66.49050495248834,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c058",
+      "pressure_drop_kPa": 0.4135415559316798,
+      "critical_temperature_C": 60.360942813164,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c059",
+      "pressure_drop_kPa": 0.8853052677935147,
+      "critical_temperature_C": 58.091303975247705,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c060",
+      "pressure_drop_kPa": 3.2335289611649283,
+      "critical_temperature_C": 57.845027729445455,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c061",
+      "pressure_drop_kPa": 1.0072221168452835,
+      "critical_temperature_C": 52.95200202993726,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c062",
+      "pressure_drop_kPa": 2.3137241888140228,
+      "critical_temperature_C": 61.91336746512304,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c063",
+      "pressure_drop_kPa": 0.7928001263057411,
+      "critical_temperature_C": 55.066904733634054,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c064",
+      "pressure_drop_kPa": 2.1578962733849463,
+      "critical_temperature_C": 53.18088737171902,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c065",
+      "pressure_drop_kPa": 1.6009740378558057,
+      "critical_temperature_C": 56.452161205312244,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c066",
+      "pressure_drop_kPa": 0.6629029196804653,
+      "critical_temperature_C": 59.78886367219416,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c067",
+      "pressure_drop_kPa": 0.5686661394473803,
+      "critical_temperature_C": 60.73658004376058,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c068",
+      "pressure_drop_kPa": 0.5598960048414041,
+      "critical_temperature_C": 58.246209831841625,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c069",
+      "pressure_drop_kPa": 0.3906061178215283,
+      "critical_temperature_C": 60.52259549964686,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c070",
+      "pressure_drop_kPa": 1.701880516955455,
+      "critical_temperature_C": 54.16012986289178,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c071",
+      "pressure_drop_kPa": 1.3642490635998734,
+      "critical_temperature_C": 52.791300317964556,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c072",
+      "pressure_drop_kPa": 0.5139935618487563,
+      "critical_temperature_C": 56.62520967573474,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c073",
+      "pressure_drop_kPa": 0.7963862141868763,
+      "critical_temperature_C": 60.518244216578765,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c074",
+      "pressure_drop_kPa": 1.6828172398440426,
+      "critical_temperature_C": 55.410854080769454,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c075",
+      "pressure_drop_kPa": 1.375535744498764,
+      "critical_temperature_C": 52.790313644829396,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c076",
+      "pressure_drop_kPa": 1.4365410404429062,
+      "critical_temperature_C": 53.82228263260486,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c077",
+      "pressure_drop_kPa": 0.44890089644888614,
+      "critical_temperature_C": 58.31621306946143,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c078",
+      "pressure_drop_kPa": 1.974495017485415,
+      "critical_temperature_C": 52.168910857832564,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c079",
+      "pressure_drop_kPa": 0.5515641714342255,
+      "critical_temperature_C": 57.00270002560277,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c080",
+      "pressure_drop_kPa": 0.4463417631619834,
+      "critical_temperature_C": 60.14484755711898,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c081",
+      "pressure_drop_kPa": 0.4957111946219657,
+      "critical_temperature_C": 58.41948874866508,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c082",
+      "pressure_drop_kPa": 0.9191949114611166,
+      "critical_temperature_C": 60.105787174810075,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c083",
+      "pressure_drop_kPa": 6.171138110235944,
+      "critical_temperature_C": 51.958842284346744,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c084",
+      "pressure_drop_kPa": 0.6789475931981176,
+      "critical_temperature_C": 54.68340970159976,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c085",
+      "pressure_drop_kPa": 0.9261937803693261,
+      "critical_temperature_C": 65.08666059905148,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c086",
+      "pressure_drop_kPa": 0.475043974255884,
+      "critical_temperature_C": 61.15553421183472,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c087",
+      "pressure_drop_kPa": 5.97454423758443,
+      "critical_temperature_C": 48.58460674854092,
+      "feasible": true,
+      "nondominated": true,
+      "role": "cooling_focused"
+    },
+    {
+      "candidate_id": "c088",
+      "pressure_drop_kPa": 0.6713254163155252,
+      "critical_temperature_C": 59.337172105467694,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c089",
+      "pressure_drop_kPa": 1.515909612097258,
+      "critical_temperature_C": 51.53546591592962,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c090",
+      "pressure_drop_kPa": 8.95970501690366,
+      "critical_temperature_C": 48.90216455639583,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c091",
+      "pressure_drop_kPa": 0.683102048888084,
+      "critical_temperature_C": 59.572719454686506,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c092",
+      "pressure_drop_kPa": 1.3481498183849128,
+      "critical_temperature_C": 58.20180497197735,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c093",
+      "pressure_drop_kPa": 0.4882545584214149,
+      "critical_temperature_C": 60.4074322776354,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c094",
+      "pressure_drop_kPa": 1.347908204298376,
+      "critical_temperature_C": 51.31036516818392,
+      "feasible": true,
+      "nondominated": true,
+      "role": "balanced"
+    },
+    {
+      "candidate_id": "c095",
+      "pressure_drop_kPa": 4.421298741871192,
+      "critical_temperature_C": 50.807545972981885,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c096",
+      "pressure_drop_kPa": 2.2808814033715947,
+      "critical_temperature_C": 52.5307333752982,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c097",
+      "pressure_drop_kPa": 0.7155239507992132,
+      "critical_temperature_C": 57.532210044142786,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c098",
+      "pressure_drop_kPa": 0.43163792552261965,
+      "critical_temperature_C": 60.74835120551944,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c099",
+      "pressure_drop_kPa": 0.38345879292656926,
+      "critical_temperature_C": 59.55546450158741,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c100",
+      "pressure_drop_kPa": 0.8987837466259676,
+      "critical_temperature_C": 58.24460616467178,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c101",
+      "pressure_drop_kPa": 3.8123782156609125,
+      "critical_temperature_C": 50.551506996981345,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c102",
+      "pressure_drop_kPa": 1.5431140131627628,
+      "critical_temperature_C": 59.912511509329725,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c103",
+      "pressure_drop_kPa": 0.5364670099289465,
+      "critical_temperature_C": 58.935156096329095,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c104",
+      "pressure_drop_kPa": 0.34463829487650954,
+      "critical_temperature_C": 61.03291755543684,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c105",
+      "pressure_drop_kPa": 0.5711339350813982,
+      "critical_temperature_C": 56.75544602012772,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c106",
+      "pressure_drop_kPa": 1.3069965479961076,
+      "critical_temperature_C": 61.30423118470425,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c107",
+      "pressure_drop_kPa": 0.4089375632524507,
+      "critical_temperature_C": 61.64929122127316,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c108",
+      "pressure_drop_kPa": 1.2125181249851975,
+      "critical_temperature_C": 52.486617630524805,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c109",
+      "pressure_drop_kPa": 0.37307720094062796,
+      "critical_temperature_C": 61.21278968701355,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c110",
+      "pressure_drop_kPa": 0.5222090155615478,
+      "critical_temperature_C": 58.62301467443987,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c111",
+      "pressure_drop_kPa": 0.40639198262312404,
+      "critical_temperature_C": 59.88062673162679,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c112",
+      "pressure_drop_kPa": 0.4951538669483306,
+      "critical_temperature_C": 62.20056867925794,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c113",
+      "pressure_drop_kPa": 0.43130965118947046,
+      "critical_temperature_C": 58.762181178715295,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c114",
+      "pressure_drop_kPa": 0.6127139479124961,
+      "critical_temperature_C": 59.31010672259882,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c115",
+      "pressure_drop_kPa": 4.629236251944859,
+      "critical_temperature_C": 51.33892090122667,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c116",
+      "pressure_drop_kPa": 0.5581363349767979,
+      "critical_temperature_C": 59.87538618125609,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c117",
+      "pressure_drop_kPa": 1.6596736141932118,
+      "critical_temperature_C": 51.54113361504493,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c118",
+      "pressure_drop_kPa": 3.9830098987782536,
+      "critical_temperature_C": 50.85338852766733,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c119",
+      "pressure_drop_kPa": 5.36068034368725,
+      "critical_temperature_C": 50.43951713366875,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c120",
+      "pressure_drop_kPa": 2.7444561541137924,
+      "critical_temperature_C": 51.64035521567665,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c121",
+      "pressure_drop_kPa": 0.41185671241096117,
+      "critical_temperature_C": 60.08928346182012,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c122",
+      "pressure_drop_kPa": 1.0263273081652071,
+      "critical_temperature_C": 57.0354044546516,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c123",
+      "pressure_drop_kPa": 1.3367449375426317,
+      "critical_temperature_C": 54.241428929766045,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c124",
+      "pressure_drop_kPa": 0.730280551418875,
+      "critical_temperature_C": 60.24554255862059,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c125",
+      "pressure_drop_kPa": 7.363379726179123,
+      "critical_temperature_C": 48.71941220329377,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c126",
+      "pressure_drop_kPa": 0.7274326511651927,
+      "critical_temperature_C": 57.35421595731617,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c127",
+      "pressure_drop_kPa": 0.8026069994011831,
+      "critical_temperature_C": 73.94839411930272,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c128",
+      "pressure_drop_kPa": 0.727856281109618,
+      "critical_temperature_C": 65.20602090181458,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c129",
+      "pressure_drop_kPa": 0.7561394426883604,
+      "critical_temperature_C": 64.44682664018339,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c130",
+      "pressure_drop_kPa": 0.8265716136294217,
+      "critical_temperature_C": 65.1357322691562,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c131",
+      "pressure_drop_kPa": 0.5771215756889235,
+      "critical_temperature_C": 56.34767133472279,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c132",
+      "pressure_drop_kPa": 3.267128407905731,
+      "critical_temperature_C": 50.766943239004014,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c133",
+      "pressure_drop_kPa": 0.8143170241871034,
+      "critical_temperature_C": 79.43216366510056,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c134",
+      "pressure_drop_kPa": 1.0595744084687118,
+      "critical_temperature_C": 65.83750286796023,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c135",
+      "pressure_drop_kPa": 0.46456624057706974,
+      "critical_temperature_C": 57.35577163937445,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c136",
+      "pressure_drop_kPa": 0.42743942529439016,
+      "critical_temperature_C": 59.41023171140593,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c137",
+      "pressure_drop_kPa": 0.6511204783060219,
+      "critical_temperature_C": 74.19321567890758,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c138",
+      "pressure_drop_kPa": 0.6254221220634851,
+      "critical_temperature_C": 59.548999432056476,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c139",
+      "pressure_drop_kPa": 1.341465389106145,
+      "critical_temperature_C": 59.31816510658779,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c140",
+      "pressure_drop_kPa": 0.49740094058231893,
+      "critical_temperature_C": 58.33778750370213,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c141",
+      "pressure_drop_kPa": 0.5042147361998726,
+      "critical_temperature_C": 58.216170635488915,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c142",
+      "pressure_drop_kPa": 2.4659336658760305,
+      "critical_temperature_C": 49.81242194759383,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c143",
+      "pressure_drop_kPa": 0.6663686485376253,
+      "critical_temperature_C": 63.654407196155375,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c144",
+      "pressure_drop_kPa": 2.185908523375828,
+      "critical_temperature_C": 52.08497013009551,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c145",
+      "pressure_drop_kPa": 0.8681246721031632,
+      "critical_temperature_C": 55.869934084279095,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c146",
+      "pressure_drop_kPa": 0.5773980668166421,
+      "critical_temperature_C": 59.48484045405654,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c147",
+      "pressure_drop_kPa": 0.3997952838143444,
+      "critical_temperature_C": 59.10065928174086,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c148",
+      "pressure_drop_kPa": 1.8305479033937078,
+      "critical_temperature_C": 61.82340483543402,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c149",
+      "pressure_drop_kPa": 1.0532907894241073,
+      "critical_temperature_C": 81.10603328268817,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c150",
+      "pressure_drop_kPa": 0.9902060391184168,
+      "critical_temperature_C": 64.64243741004664,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c151",
+      "pressure_drop_kPa": 1.062444904036606,
+      "critical_temperature_C": 52.324455967471955,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c152",
+      "pressure_drop_kPa": 0.90591347487621,
+      "critical_temperature_C": 57.594545754012486,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c153",
+      "pressure_drop_kPa": 0.7500127822328149,
+      "critical_temperature_C": 76.4118223146045,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c154",
+      "pressure_drop_kPa": 3.348187514594661,
+      "critical_temperature_C": 53.81497848115681,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c155",
+      "pressure_drop_kPa": 0.3176613889879533,
+      "critical_temperature_C": 62.34382747929662,
+      "feasible": true,
+      "nondominated": true,
+      "role": "pressure_focused"
+    },
+    {
+      "candidate_id": "c156",
+      "pressure_drop_kPa": 1.7199916393920855,
+      "critical_temperature_C": 56.88589753723748,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c157",
+      "pressure_drop_kPa": 1.8505443277012696,
+      "critical_temperature_C": 50.710198361133095,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c158",
+      "pressure_drop_kPa": 2.3214586792347722,
+      "critical_temperature_C": 54.62710739287657,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c159",
+      "pressure_drop_kPa": 2.8933844740251606,
+      "critical_temperature_C": 53.36332405975229,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c160",
+      "pressure_drop_kPa": 0.3843682905327137,
+      "critical_temperature_C": 59.691665546020246,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c161",
+      "pressure_drop_kPa": 0.4098785872921463,
+      "critical_temperature_C": 58.886499717509565,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c162",
+      "pressure_drop_kPa": 0.32869810761277746,
+      "critical_temperature_C": 61.80001830474507,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c163",
+      "pressure_drop_kPa": 0.60885490693731,
+      "critical_temperature_C": 63.669209029894084,
+      "feasible": true,
+      "nondominated": false,
+      "role": null
+    },
+    {
+      "candidate_id": "c164",
+      "pressure_drop_kPa": 0.8341212825746782,
+      "critical_temperature_C": 53.204061305214154,
+      "feasible": true,
+      "nondominated": true,
+      "role": null
+    },
+    {
+      "candidate_id": "c165",
+      "pressure_drop_kPa": 0.7410361177125646,
+      "critical_temperature_C": 74.6000861726787,
+      "feasible": false,
+      "nondominated": false,
+      "role": null
+    }
+  ]
+}

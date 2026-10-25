@@ -1,83 +1,89 @@
-import csv from "../../data/designs.csv?raw";
+import example from "../../data/example_results.json";
 
-type Row = { id: string; dp: number; t: number; hbm: number };
-const LIMIT = { dp: 4, t: 100, hbm: 70 };
-const NAMED: Record<string, string> = { "P-LOWDP": "Min ΔP", "P-BAL": "Balanced", "P-COOL": "Min T" };
+type Candidate = {
+  candidate_id: string;
+  pressure_drop_kPa: number;
+  critical_temperature_C: number;
+  feasible: boolean;
+  nondominated: boolean;
+  role: string | null;
+};
 
-const rows: Row[] = csv
-  .trim()
-  .split(/\r?\n/)
-  .slice(1)
-  .map((l) => l.split(","))
-  .map(([id, , dp, t, hbm]) => ({ id, dp: +dp, t: +t, hbm: +hbm }))
-  .filter((r) => Number.isFinite(r.dp) && Number.isFinite(r.t));
-
-const ok = (r: Row) => r.dp <= LIMIT.dp && r.t <= LIMIT.t && r.hbm <= LIMIT.hbm;
-const front = (() => {
-  let best = Infinity;
-  return [...rows.filter(ok)].sort((a, b) => a.dp - b.dp).filter((r) => (r.t < best ? ((best = r.t), true) : false));
-})();
-const onFront = new Set(front.map((r) => r.id));
-
-const W = 560, H = 380, L = 52, B = 44, T = 16, Rp = 16;
-const X0 = 0.5, X1 = 4.75, Y0 = 68, Y1 = 107;
-const sx = (v: number) => L + ((v - X0) / (X1 - X0)) * (W - L - Rp);
-const sy = (v: number) => T + (1 - (v - Y0) / (Y1 - Y0)) * (H - T - B);
+const data = example as {
+  algorithm: { name: string; pop_size: number; n_gen: number; n_evaluated: number };
+  candidates: Candidate[];
+  front_candidate_ids: string[];
+};
+const frontIds = new Set(data.front_candidate_ids);
+const candidates = data.candidates.filter((candidate) => candidate.feasible);
+const front = candidates.filter((candidate) => frontIds.has(candidate.candidate_id))
+  .sort((a, b) => a.pressure_drop_kPa - b.pressure_drop_kPa);
+const roles: Record<string, string> = {
+  pressure_focused: "Min ΔP",
+  cooling_focused: "Min T",
+  balanced: "Balanced",
+};
+const W = 560, H = 360, L = 62, B = 48, T = 22, R = 18;
+const extent = (key: "pressure_drop_kPa" | "critical_temperature_C") => {
+  const values = candidates.map((candidate) => candidate[key]);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const padding = Math.max((maximum - minimum) * 0.08, 0.1);
+  return [minimum - padding, maximum + padding] as const;
+};
+const [x0, x1] = extent("pressure_drop_kPa");
+const [y0, y1] = extent("critical_temperature_C");
+const sx = (value: number) => L + ((value - x0) / (x1 - x0)) * (W - L - R);
+const sy = (value: number) => T + (1 - (value - y0) / (y1 - y0)) * (H - T - B);
+const num = (value: number) => value.toFixed(2);
 
 export default function ParetoPreview() {
-  const infeasible = rows.filter((r) => !ok(r)).length;
+  const named = front.filter((candidate) => candidate.role);
   return (
     <figure className="w-full min-w-0">
-      <p className="mb-2 font-mono text-[11px] text-slate-500 md:hidden">Swipe to scroll the chart →</p>
-      <div className="overflow-x-auto" tabIndex={0} aria-label="Pareto chart, scrollable on small screens">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[500px]" role="img" aria-label="Pareto chart of pressure drop versus GPU temperature for the sample design set, highlighting the Min ΔP, Balanced and Min T designs">
-        {[1, 2, 3, 4].map((v) => (
-          <g key={v}>
-            <line x1={sx(v)} x2={sx(v)} y1={T} y2={H - B} stroke="#1e293b" />
-            <text x={sx(v)} y={H - B + 18} textAnchor="middle" className="fill-slate-500 font-mono text-[11px]">{v}</text>
-          </g>
-        ))}
-        {[70, 80, 90, 100].map((v) => (
-          <g key={v}>
-            <line x1={L} x2={W - Rp} y1={sy(v)} y2={sy(v)} stroke="#1e293b" />
-            <text x={L - 10} y={sy(v) + 4} textAnchor="end" className="fill-slate-500 font-mono text-[11px]">{v}</text>
-          </g>
-        ))}
-        <text x={(L + W - Rp) / 2} y={H - 6} textAnchor="middle" className="fill-slate-400 font-mono text-[11px]">pressure drop ΔP (psi)</text>
-        <text transform={`translate(14 ${(T + H - B) / 2}) rotate(-90)`} textAnchor="middle" className="fill-slate-400 font-mono text-[11px]">max GPU temperature (°C)</text>
-
-        <line x1={sx(LIMIT.dp)} x2={sx(LIMIT.dp)} y1={T} y2={H - B} stroke="#f87171" strokeDasharray="4 4" opacity="0.7" />
-        <text x={sx(LIMIT.dp) - 6} y={T + 12} textAnchor="end" className="fill-red-300 font-mono text-[10px]">4 psi limit</text>
-        <line x1={L} x2={W - Rp} y1={sy(LIMIT.t)} y2={sy(LIMIT.t)} stroke="#f87171" strokeDasharray="4 4" opacity="0.7" />
-        <text x={W - Rp - 4} y={sy(LIMIT.t) - 6} textAnchor="end" className="fill-red-300 font-mono text-[10px]">100 °C limit</text>
-
-        <polyline points={front.map((r) => `${sx(r.dp)},${sy(r.t)}`).join(" ")} fill="none" stroke="#67e8f9" strokeWidth="1.5" opacity="0.6" />
-
-        {rows.map((r) =>
-          !ok(r) ? (
-            <g key={r.id} stroke="#f87171" strokeWidth="1.5" opacity="0.8">
-              <line x1={sx(r.dp) - 3.5} y1={sy(r.t) - 3.5} x2={sx(r.dp) + 3.5} y2={sy(r.t) + 3.5} />
-              <line x1={sx(r.dp) - 3.5} y1={sy(r.t) + 3.5} x2={sx(r.dp) + 3.5} y2={sy(r.t) - 3.5} />
-            </g>
-          ) : NAMED[r.id] ? null : (
-            <circle key={r.id} cx={sx(r.dp)} cy={sy(r.t)} r={onFront.has(r.id) ? 3.5 : 3} fill={onFront.has(r.id) ? "#67e8f9" : "#475569"} />
-          ),
-        )}
-        {rows.filter((r) => NAMED[r.id]).map((r) => (
-          <g key={r.id}>
-            <circle cx={sx(r.dp)} cy={sy(r.t)} r="7" fill="#070a10" stroke="#a5f3fc" strokeWidth="2" />
-            <circle cx={sx(r.dp)} cy={sy(r.t)} r="3" fill="#a5f3fc" />
-            <text x={sx(r.dp) + (r.id === "P-COOL" ? -12 : 12)} y={sy(r.t) + (r.id === "P-LOWDP" ? -12 : 22)} textAnchor={r.id === "P-COOL" ? "end" : "start"} className="fill-slate-100 font-display text-[13px] font-semibold">{NAMED[r.id]}</text>
-            <text x={sx(r.dp) + (r.id === "P-COOL" ? -12 : 12)} y={sy(r.t) + (r.id === "P-LOWDP" ? 3 : 36)} textAnchor={r.id === "P-COOL" ? "end" : "start"} className="fill-slate-400 font-mono text-[10px]">{r.dp} psi · {r.t} °C</text>
-          </g>
-        ))}
-      </svg>
+      <p className="mb-3 font-mono text-xs text-orange-200">
+        Example: engine run on the reference package (reduced-order model, not CFD)
+      </p>
+      <div className="overflow-x-auto" tabIndex={0} aria-label="Scrollable Pareto plot">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[500px]" role="img"
+          aria-label={`Reference engine run. ${front.length} nondominated designs from ${data.algorithm.n_evaluated} evaluated candidates. Pressure drop versus critical component temperature.`}>
+          {[0, 1, 2, 3, 4].map((tick) => {
+            const value = x0 + (x1 - x0) * tick / 4;
+            return <g key={`x${tick}`}>
+              <line x1={sx(value)} x2={sx(value)} y1={T} y2={H - B} stroke="#263445" />
+              <text x={sx(value)} y={H - B + 18} textAnchor="middle" className="fill-slate-400 font-mono text-[10px]">{num(value)}</text>
+            </g>;
+          })}
+          {[0, 1, 2, 3, 4].map((tick) => {
+            const value = y0 + (y1 - y0) * tick / 4;
+            return <g key={`y${tick}`}>
+              <line x1={L} x2={W - R} y1={sy(value)} y2={sy(value)} stroke="#263445" />
+              <text x={L - 8} y={sy(value) + 4} textAnchor="end" className="fill-slate-400 font-mono text-[10px]">{num(value)}</text>
+            </g>;
+          })}
+          <text x={(L + W - R) / 2} y={H - 4} textAnchor="middle" className="fill-slate-300 font-mono text-[11px]">Pressure drop ΔP (kPa)</text>
+          <text transform={`translate(14 ${(T + H - B) / 2}) rotate(-90)`} textAnchor="middle" className="fill-slate-300 font-mono text-[11px]">Critical temperature (°C)</text>
+          <polyline points={front.map((candidate) => `${sx(candidate.pressure_drop_kPa)},${sy(candidate.critical_temperature_C)}`).join(" ")}
+            fill="none" stroke="#67e8f9" strokeWidth="2" />
+          {candidates.map((candidate) => {
+            const role = candidate.role ? roles[candidate.role] || candidate.role : null;
+            return <g key={candidate.candidate_id}>
+              <circle cx={sx(candidate.pressure_drop_kPa)} cy={sy(candidate.critical_temperature_C)}
+                r={role ? 6 : 3} fill={frontIds.has(candidate.candidate_id) ? "#67e8f9" : "#64748b"}
+                stroke={role ? "#fff" : "none"} strokeWidth="1.5">
+                <title>{`${candidate.candidate_id}: ${num(candidate.pressure_drop_kPa)} kPa, ${num(candidate.critical_temperature_C)} °C${role ? ` · ${role}` : ""}`}</title>
+              </circle>
+              {role && <text x={sx(candidate.pressure_drop_kPa) + 8} y={sy(candidate.critical_temperature_C) - 8}
+                className="fill-slate-100 font-mono text-[10px]">{role}</text>}
+            </g>;
+          })}
+        </svg>
       </div>
-      <figcaption className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px] text-slate-500">
-        <span><span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-cyan-300" />Pareto front</span>
-        <span><span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-slate-600" />dominated</span>
-        <span className="text-red-300/80">× {infeasible} violate limits</span>
-        <span>Sample design set ({rows.length} designs), placeholder until CFD results land</span>
+      <figcaption className="mt-3 space-y-1 font-mono text-[11px] text-slate-400">
+        <p>{data.algorithm.name} · {data.algorithm.pop_size} × {data.algorithm.n_gen} generations · {data.algorithm.n_evaluated} unique evaluations · {front.length} Pareto designs</p>
+        {named.map((candidate) => <p key={candidate.candidate_id}>
+          {roles[candidate.role!] || candidate.role}: {candidate.candidate_id} · {num(candidate.pressure_drop_kPa)} kPa · {num(candidate.critical_temperature_C)} °C
+        </p>)}
       </figcaption>
     </figure>
   );

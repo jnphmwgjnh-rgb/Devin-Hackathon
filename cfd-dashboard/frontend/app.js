@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const state = {
@@ -10,6 +11,7 @@ const state = {
   modalRunId: null,
   latestCompletedId: null,
 };
+const campaign = { data: null, timer: null, seenCandidates: new Set(), seenPareto: new Set() };
 
 const $ = (id) => document.getElementById(id);
 const COLORS = { accent: "#ff9f43", blue: "#4dabf7", muted: "#5b6878", grid: "#2a3340", text: "#e6edf3", bad: "#f85149" };
@@ -36,10 +38,17 @@ const PARAM_LABELS = {
   fin_thickness_mm: ["Fin thickness", 2, "mm"],
   base_thickness_mm: ["Base thickness", 2, "mm"],
   inlet_velocity_m_s: ["Inlet velocity", 2, "m/s"],
+  channel_width_by_zone_mm: ["Channel width by zone", 2, "mm"],
 };
 function fmtParam(key, value) {
   const spec = PARAM_LABELS[key];
-  if (!spec) return { label: key, text: typeof value === "number" ? fmt(value, 3) : String(value) };
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const text = Object.entries(value)
+      .map(([name, amount]) => `${name}: ${typeof amount === "number" ? fmt(amount, 2) : String(amount)}${spec?.[2] ? ` ${spec[2]}` : ""}`)
+      .join(", ");
+    return { label: spec?.[0] || key, text };
+  }
+  if (!spec) return { label: key, text: typeof value === "number" ? fmt(value, 3) : String(value ?? "–") };
   return { label: spec[0], text: `${typeof value === "number" ? fmt(value, spec[1]) : value}${spec[2] ? " " + spec[2] : ""}` };
 }
 
@@ -169,9 +178,13 @@ function renderStats() {
   const s = state.summary;
   if (!s) return;
   const done = s.completed + s.failed;
-  const budget = Math.max(s.budget || 0, s.total || 0);
-  $("stat-progress").textContent = budget ? `${done} / ${budget} runs` : `${done} runs`;
-  $("stat-progress-bar").style.width = budget ? `${Math.min(100, (100 * done) / budget)}%` : "0";
+  const c = campaign.data;
+  const evaluated = c?.evaluated ?? s.total;
+  const planned = c?.planned ?? 0;
+  $("stat-progress").textContent = c?.status === "completed"
+    ? `${evaluated} evaluated`
+    : planned ? `${evaluated} / ${planned} evaluated` : `${done} runs`;
+  $("stat-progress-bar").style.width = `${Math.round((c?.progress || 0) * 100)}%`;
   $("stat-running").textContent = s.running;
   $("stat-failed").textContent = s.failed;
   $("stat-pareto").textContent = s.pareto_ids.length;
@@ -183,14 +196,14 @@ function renderStats() {
   $("stat-best-t-id").textContent = bestT ? bestT.id : "";
   $("stat-best-dp-wrap").onclick = bestDp ? () => openModal(bestDp.id) : null;
   $("stat-best-t-wrap").onclick = bestT ? () => openModal(bestT.id) : null;
-  const finished = budget && done >= budget;
-  $("stat-eta").textContent = finished ? "Done" : fmtDuration(s.eta_s);
-  $("stat-avg").textContent = s.avg_runtime_s ? `avg ${fmtDuration(s.avg_runtime_s)} / run` : "";
+  $("stat-eta").textContent = c?.status === "completed" ? "Done" : fmtDuration(c?.eta_s);
+  $("stat-avg").textContent = c?.mean_evaluation_s
+    ? `mean ${fmtDuration(c.mean_evaluation_s)} / evaluation`
+    : "";
 }
 
 let paretoInit = false;
 function renderPareto() {
-  if (sortedRuns().some((r) => r.status === "completed")) $("campaign-overlay")?.classList.add("hidden");
   const runs = sortedRuns();
   const completed = runs.filter((r) => r.status === "completed" && hasMetrics(r));
   const front = completed.filter((r) => r.on_pareto).sort((a, b) => a.metrics.pressure_drop_pa - b.metrics.pressure_drop_pa);
@@ -204,13 +217,13 @@ function renderPareto() {
     y: list.map((r) => r.metrics.max_temperature_k),
     customdata: list.map((r) => [r.id]),
   });
-  // Modelling runs without CAD (only the 5 selected designs get geometry) are greyed out and
-  // inert: no hover, no click. OpenFOAM runs and runs with geometry stay interactive.
+  // Candidates without exported geometry remain visible, but are not selectable for CAD.
   const noCad = (r) => r.details && r.details.source && !r.has_geometry;
   const frontCad = front.filter((r) => !noCad(r));
   const traces = [
-    { ...pts(completed.filter(noCad)), name: "No CAD (metrics only)", mode: "markers", type: "scatter",
-      hoverinfo: "skip", marker: { size: 8, color: "rgba(90,98,110,.35)", line: { width: 0 } } },
+    { ...pts(completed.filter(noCad)), name: "CAD exported for Pareto designs only", mode: "markers", type: "scatter",
+      hovertemplate: "<b>%{customdata[0]}</b><br>CAD exported for Pareto designs only<extra></extra>",
+      marker: { size: 8, color: "rgba(90,98,110,.45)", line: { width: 0 } } },
     { ...pts(dominated.filter((r) => !noCad(r))), name: "Dominated", mode: "markers", type: "scatter", hovertemplate: hover,
       marker: { size: 9, color: "rgba(139,152,168,.55)", line: { width: 1, color: "#8b98a8" } } },
     { x: front.map((r) => r.metrics.pressure_drop_pa), y: front.map((r) => r.metrics.max_temperature_k),
@@ -243,7 +256,7 @@ function renderPareto() {
       const cd = ev.points?.[0]?.customdata;
       const id = Array.isArray(cd) ? cd[0] : cd;
       const run = id && state.runs.get(id);
-      if (run && !(run.details && run.details.source && !run.has_geometry)) openModal(id);
+      if (run) openModal(id);
     });
   }
 }
@@ -313,40 +326,10 @@ function initFilters() {
   });
 }
 
-// ---------- residual plots ----------
-function residualTraces(res) {
-  if (!res || !res.iterations?.length) return [];
-  return Object.entries(res.fields).map(([name, vals], i) => ({
-    x: res.iterations, y: vals, name, type: "scatter", mode: "lines",
-    line: { width: 1.5, color: RESIDUAL_COLORS[i % RESIDUAL_COLORS.length] },
-  }));
-}
-function residualLayout(emptyText) {
-  return {
-    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
-    font: { color: COLORS.text, size: 11 }, margin: { l: 50, r: 10, t: 6, b: 34 },
-    xaxis: { title: "Iteration", gridcolor: COLORS.grid, zerolinecolor: COLORS.grid },
-    yaxis: { type: "log", gridcolor: COLORS.grid, exponentformat: "e", zerolinecolor: COLORS.grid },
-    legend: { orientation: "h", y: 1.15, x: 0, font: { size: 10 } }, uirevision: "res",
-    annotations: emptyText ? [{ text: emptyText, showarrow: false, font: { color: COLORS.muted }, xref: "paper", yref: "paper", x: 0.5, y: 0.5 }] : [],
-  };
-}
 async function fetchRun(id) {
   const r = await fetch(`/api/runs/${encodeURIComponent(id)}`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
-}
-let livePollBusy = false;
-async function pollLiveResiduals() {
-  if (livePollBusy) return;
-  const id = state.liveRunId;
-  $("live-run-label").textContent = id || "";
-  if (!id) { Plotly.react("live-residuals", [], residualLayout("No run in progress"), { displayModeBar: false, responsive: true }); return; }
-  livePollBusy = true;
-  try {
-    const run = await fetchRun(id);
-    if (state.liveRunId === id) Plotly.react("live-residuals", residualTraces(run.residuals), residualLayout(run.residuals?.iterations?.length ? "" : "Waiting for solver output…"), { displayModeBar: false, responsive: true });
-  } catch (_) { /* transient */ } finally { livePollBusy = false; }
 }
 
 // ---------- modal ----------
@@ -409,6 +392,7 @@ async function refreshModal(loadGeometry) {
     ["Solver", run.solver || "–"],
     ["Mesh cells", fmtInt(run.mesh_cells)],
     ["Iterations", `${fmtInt(run.iteration)} / ${fmtInt(run.end_iteration)}`],
+    ["Energy residual", fmt(m.energy_residual, 6)],
     ["Runtime", fmtDuration(run.runtime_s)],
     ["Started", run.started_at ? new Date(run.started_at).toLocaleString() : "–"],
     ["Finished", run.finished_at ? new Date(run.finished_at).toLocaleString() : "–"],
@@ -416,9 +400,6 @@ async function refreshModal(loadGeometry) {
 
   const det = run.details || {};
   if (det.source === "stage3-reduced-order-model") {
-    Plotly.react("modal-residual-plot", [],
-      residualLayout("Reduced-order model — no solver residuals"),
-      { displayModeBar: false, responsive: true });
     const fnum = (v) => v == null ? "–" : Number(v).toFixed(1);
     $("modal-compare").innerHTML =
       `<div class="rom-details">` +
@@ -429,12 +410,7 @@ async function refreshModal(loadGeometry) {
       (det.role ? `<div class="metric"><div class="label">Role</div><div class="value">${esc(det.role.replaceAll("_", " "))}</div></div>` : "") +
       `</div>` +
       ((det.violations || []).length ? `<div class="campaign-error">${det.violations.map((v) => esc(`${v.constraint || ""}:${v.component || ""} ${v.value}>${v.limit}`)).join("; ")}</div>` : "") +
-      `<div class="rom-files">` +
-      (det.files || []).map((n) => `<a href="/api/runs/${encodeURIComponent(run.id)}/files/${n}">${esc(n)}</a>`).join(" ") +
-      `</div>`;
-  } else {
-    Plotly.react("modal-residual-plot", residualTraces(run.residuals),
-      residualLayout(run.residuals?.iterations?.length ? "" : "No residual data"), { displayModeBar: false, responsive: true });
+      (!run.has_geometry ? `<p class="cad-reason">CAD exported for Pareto designs only</p>` : "");
   }
 
   if (loadGeometry) loadViewer(run);
@@ -471,27 +447,56 @@ function disposeViewer() {
 async function loadViewer(run) {
   disposeViewer();
   const el = $("viewer");
-  const dl = $("modal-download");
-  if (dl) { dl.style.display = run.has_geometry ? "block" : "none"; dl.style.width = "fit-content"; dl.href = `/api/runs/${encodeURIComponent(run.id)}/geometry`; dl.download = `${run.id}_${(run.details && run.details.role) || "design"}.stl`; }
+  const designId = run.details?.design_id;
+  const downloads = $("cad-downloads");
+  $("modal-design-id").textContent = designId ? `Design ID: ${designId}` : "";
+  downloads.classList.toggle("hidden", !(run.has_geometry && designId));
+  for (const ext of ["step", "stl"]) {
+    const link = $(`download-${ext}`);
+    link.href = `/api/runs/${encodeURIComponent(run.id)}/cad?format=${ext}`;
+    link.download = designId ? `${designId}.${ext}` : "";
+  }
   el.innerHTML = "";
-  if (!run.has_geometry) { el.textContent = run.details && run.details.source ? "CAD is exported only for the 5 selected designs (diamonds on the Pareto plot) — pick one of those to see its 3D geometry." : "No CAD geometry for this run"; return; }
+  if (!run.has_geometry || !designId) {
+    el.textContent = run.details?.source
+      ? "CAD exported for Pareto designs only"
+      : "No CAD geometry for this run";
+    return;
+  }
   el.textContent = "Loading geometry…";
-  let buf;
+  const files = run.details.files || [];
+  const format = files.includes(`${designId}.glb`) ? "glb" : "stl";
+  let object;
   try {
-    const res = await fetch(`/api/runs/${encodeURIComponent(run.id)}/geometry`);
+    const res = await fetch(`/api/runs/${encodeURIComponent(run.id)}/cad?format=${format}`);
     if (!res.ok) throw new Error();
-    buf = await res.arrayBuffer();
+    const buffer = await res.arrayBuffer();
+    if (format === "glb") {
+      const gltf = await new GLTFLoader().parseAsync(buffer, "");
+      object = gltf.scene;
+    } else {
+      const geometry = new STLLoader().parse(buffer);
+      geometry.rotateX(-Math.PI / 2);
+      geometry.computeVertexNormals();
+      object = new THREE.Group();
+      const mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.55, roughness: 0.35 }),
+      );
+      object.add(mesh);
+      object.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry, 30),
+        new THREE.LineBasicMaterial({ color: 0x2b3a4a, transparent: true, opacity: 0.6 }),
+      ));
+    }
   } catch (_) { el.textContent = "Could not load geometry"; return; }
   if (state.modalRunId !== run.id) return;
   el.textContent = "";
 
-  const geometry = new STLLoader().parse(buf);
-  geometry.rotateX(-Math.PI / 2);
-  geometry.computeBoundingBox();
-  const box = geometry.boundingBox;
+  let box = new THREE.Box3().setFromObject(object);
   const center = box.getCenter(new THREE.Vector3());
-  geometry.translate(-center.x, -box.min.y, -center.z);
-  geometry.computeVertexNormals();
+  object.position.set(-center.x, -box.min.y, -center.z);
+  box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3()).length();
 
   const scene = new THREE.Scene();
@@ -506,10 +511,7 @@ async function loadViewer(run) {
   const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(1, 2, 1.5); scene.add(key);
   const rim = new THREE.DirectionalLight(0x88aaff, 0.6); rim.position.set(-1.5, 1, -1); scene.add(rim);
 
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.55, roughness: 0.35 }));
-  scene.add(mesh);
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 30), new THREE.LineBasicMaterial({ color: 0x2b3a4a, transparent: true, opacity: 0.6 }));
-  scene.add(edges);
+  scene.add(object);
   const grid = new THREE.GridHelper(size * 1.5, 20, 0x3a4656, 0x222b36);
   scene.add(grid);
 
@@ -557,27 +559,20 @@ async function boot() {
   render();
   connect();
   pollLiveResiduals();
-  setInterval(pollLiveResiduals, 3000);
   setInterval(() => { if (state.modalRunId && state.runs.get(state.modalRunId)?.status === "running") refreshModal(false); }, 3000);
 }
 boot();
 
-// ---- stage-3 modelling campaign ------------------------------------------
-const campaign = { data: null, timer: null };
-const STEP_LABELS = [
-  ["interpreting", "Interpreting requirements with Devin"],
-  ["generating", "Generating geometry"],
-  ["evaluating", "Simulating candidates"],
-  ["selecting", "Selecting designs"],
-  ["exporting", "Exporting CAD"],
-];
-
+// ---- modelling campaign --------------------------------------------------
 async function pollCampaign() {
+  const previous = campaign.data;
   try {
     const r = await fetch("/api/modelling/status");
     campaign.data = await r.json();
   } catch (e) { campaign.data = null; }
+  notifyCampaign(previous, campaign.data);
   renderCampaign();
+  renderStats();
   const s = campaign.data;
   if (s && (s.status === "running" || s.status === "queued")) {
     if (!campaign.timer) campaign.timer = setInterval(pollCampaign, 1000);
@@ -586,55 +581,57 @@ async function pollCampaign() {
   }
 }
 
+function notifyCampaign(previous, current) {
+  if (!current) return;
+  if (previous?.campaign_id && previous.campaign_id !== current.campaign_id) {
+    campaign.seenCandidates.clear();
+    campaign.seenPareto.clear();
+  }
+  for (const id of current.candidate_updates || []) {
+    if (campaign.seenCandidates.has(id)) continue;
+    campaign.seenCandidates.add(id);
+    addActivity("•", `Candidate ${id} evaluated`, id);
+    if (notifyMode() === "all") {
+      showToast({ title: `${id} evaluated`, body: "Candidate metrics are available.", runId: id });
+    }
+  }
+  for (const id of current.new_pareto_ids || []) {
+    if (campaign.seenPareto.has(id)) continue;
+    campaign.seenPareto.add(id);
+    addActivity("★", `${id} joined the Pareto front`, id);
+    if (notifyMode() !== "off") {
+      showToast({ title: `${id} joined the Pareto front`, body: "A new nondominated design was evaluated.", runId: id, kind: "pareto" });
+      desktopNotify(`${id} joined the Pareto front`, "A new nondominated design was evaluated.", id);
+    }
+  }
+}
+
 function renderCampaign() {
-  const bar = $("campaign-bar"), ov = $("campaign-overlay");
+  const bar = $("campaign-bar");
   const s = campaign.data;
-  const hasRuns = [...state.runs.values()].some((r) => r.status === "completed");
   if (!s || s.status === "idle") {
-    bar.classList.add("hidden"); ov.classList.add("hidden"); return;
+    bar.classList.add("hidden"); return;
   }
   bar.classList.remove("hidden");
-  $("campaign-mode").textContent = s.mode === "demo" ? s.demo_note : "Live computation";
-  $("campaign-stage").textContent = s.stage ? `${s.stage} — ${s.message || ""}` : "";
-  $("campaign-fill").style.width = `${Math.round((s.progress || 0) * 100)}%`;
-  const it = s.interpretation || {};
-  let devin = "";
-  if (it.provider_label) {
-    devin = `Requirements interpreted by ${it.provider_label}`;
-    if (it.session_url) devin = `<a href="${it.session_url}" target="_blank" rel="noreferrer">Requirements interpreted by Devin</a>`;
-    if (it.cached) devin += " (cached)";
-    if (s.mode === "demo") devin += " · replayed";
+  $("campaign-mode").textContent = "Engine campaign";
+  let stage = s.message || "";
+  if (s.stage === "optimize") {
+    stage = `Optimize · generation ${s.generation}/${s.n_gen} · evaluated ${s.evaluated}/${s.planned}`;
+  } else if (s.stage === "pareto") {
+    stage = `Pareto · ${s.pareto_ids?.length || 0} nondominated designs`;
+  } else if (s.stage === "cad_export") {
+    stage = `CAD export ${s.cad_exported}/${s.cad_total}`;
+  } else if (s.stage === "done") {
+    stage = `Done · ${s.evaluated} evaluations`;
   }
-  $("campaign-devin").innerHTML = devin;
+  $("campaign-stage").textContent = stage;
+  $("campaign-fill").style.width = `${Math.round((s.progress || 0) * 100)}%`;
+  $("campaign-devin").textContent = s.eta_s > 0 ? `ETA ${fmtDuration(s.eta_s)}` : "";
   $("campaign-label").textContent = s.label || "";
   $("campaign-error").textContent = s.error || "";
   bar.classList.toggle("failed", s.status === "failed");
   bar.classList.toggle("done", s.status === "completed");
 
-  // overlay only while active and no completed runs yet
-  const active = s.status === "running" || s.status === "queued";
-  if (active && !hasRuns) {
-    ov.classList.remove("hidden");
-    const steps = $("campaign-steps");
-    if (!steps.children.length) {
-      for (const [, label] of STEP_LABELS) {
-        const li = document.createElement("li");
-        li.textContent = label; steps.appendChild(li);
-      }
-    }
-    const cur = STEP_LABELS.findIndex(([k]) => k === s.stage);
-    [...steps.children].forEach((li, i) =>
-      li.classList.toggle("current", i === cur));
-  } else {
-    ov.classList.add("hidden");
-  }
-  // temperature label
-  const tl = s.temperature_label;
-  if (tl) {
-    { const w = document.querySelector("#stat-best-t-wrap .stat-label");
-      if (w) w.textContent = tl; }
-    const th = $("th-tmax"); if (th) th.textContent = tl;
-  }
 }
 
 // wrap the existing pareto render to add the selected-designs trace + label
@@ -658,15 +655,16 @@ renderPareto = function () {
 };
 pollCampaign();
 
-// Download the CAD (STL) of every run that has geometry (the 5 selected designs).
+// Download STL files for candidates with CAD.
 document.getElementById("download-cad")?.addEventListener("click", async () => {
   const withCad = [...state.runs.values()].filter((r) => r.has_geometry);
-  if (!withCad.length) { alert("No CAD yet: wait for the 'Exporting CAD' step to finish."); return; }
+  if (!withCad.length) { alert("No Pareto CAD has been exported yet."); return; }
   for (const r of withCad) {
-    const role = (r.details && r.details.role) || "design";
+    const designId = r.details?.design_id;
+    if (!designId) continue;
     const a = document.createElement("a");
-    a.href = `/api/runs/${encodeURIComponent(r.id)}/geometry`;
-    a.download = `${r.id}_${role}.stl`;
+    a.href = `/api/runs/${encodeURIComponent(r.id)}/cad?format=stl`;
+    a.download = `${designId}.stl`;
     document.body.appendChild(a); a.click(); a.remove();
     await new Promise((res) => setTimeout(res, 400));
   }

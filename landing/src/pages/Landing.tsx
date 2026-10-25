@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Link } from "react-router-dom";
 import { ArrowRight, MessageSquare } from "lucide-react";
 import PinFinFlow from "../components/PinFinFlow";
 import ParetoPreview from "../components/ParetoPreview";
@@ -14,8 +12,8 @@ const problems = [
 const steps = [
   { title: "Describe", body: "Tell the assistant what you're cooling: coolant, inlet temperature, flow rate and limits." },
   { title: "Upload", body: "Drop in the package diagram and power map. Heat sources are read from it." },
-  { title: "Simulate", body: "Fin geometry is generated, meshed and solved in CFD across the design space." },
-  { title: "Choose & export", body: "Pick a Pareto-optimal design and download its CAD with a CFD report." },
+  { title: "Estimate", body: "The reduced-order engine estimates conjugate conduction and duct-flow pressure drop; it does not run CFD." },
+  { title: "Choose & export", body: "Compare the computed Pareto candidates and download CAD for nondominated designs." },
 ];
 
 const manual = [
@@ -30,7 +28,7 @@ const manual = [
 const auto = [
   { step: "Describe", detail: "One message: coolant, inlet temperature, flow rate, limits" },
   { step: "Upload", detail: "One package diagram; heat sources are read from it" },
-  { step: "Pick", detail: "One click on a Pareto-optimal design to export CAD + CFD report" },
+  { step: "Pick", detail: "Choose a Pareto candidate and download its CAD files" },
 ];
 
 const designs = [
@@ -65,9 +63,9 @@ function Eyebrow({ n, children }: { n: string; children: React.ReactNode }) {
   );
 }
 
-export default function Landing({ demoHref = "/demo", chatHref = null }: { demoHref?: string | null; chatHref?: string | null }) {
+export default function Landing() {
   const reduce = useReducedMotion();
-  const [chatNotice, setChatNotice] = useState(false);
+  const chatUrl = import.meta.env.VITE_CHAT_URL || "/intake";
   const rise = (delay = 0) =>
     reduce
       ? {}
@@ -88,18 +86,14 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
             <a href="#outcomes" className="hover:text-white">Outcomes</a>
             <a href="#mission" className="hover:text-white">Mission</a>
           </div>
-          {demoHref ? (
-            <Link to={demoHref} className="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-white">Launch demo</Link>
-          ) : (
-            <a href="#how" className="rounded-md border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-500">How it works</a>
-          )}
+          <a href={chatUrl} className="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-white">Start a design</a>
         </div>
       </nav>
 
       <header id="top" className="mx-auto max-w-6xl px-6 pb-20 pt-14 md:pt-20">
         <div className="grid items-end gap-10 md:grid-cols-[1.4fr_1fr]">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-300">Cold plate design · CAD → CFD → Pareto</p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-300">Cold plate design · reduced-order engine → Pareto</p>
             <h1 className="mt-5 font-display text-5xl font-semibold leading-[1.02] tracking-tight md:text-7xl">
               Liquid cooling,<br />
               <span className="text-slate-400">engineered by conversation.</span>
@@ -107,16 +101,12 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
           </div>
           <div>
             <p className="text-lg leading-relaxed text-slate-300">
-              Describe what you're cooling and upload a package diagram. ColdShock AI generates the geometry, runs the CFD and returns three Pareto-optimal cold plates: lowest pressure drop, lowest temperature and the balance between them.
+              Describe your cold plate in text or use another AI to extract a package diagram. The engine evaluates candidate geometry with a reduced-order thermal and hydraulic model—not CFD—and returns nondominated trade-offs.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-5">
-              {demoHref ? (
-                <Link to={demoHref} className="group inline-flex items-center gap-2 rounded-md bg-cyan-300 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-200">
-                  Start a design <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                </Link>
-              ) : (
-                <span className="font-mono text-xs text-slate-500">The interactive demo runs in the full app.</span>
-              )}
+              <a href={chatUrl} className="group inline-flex items-center gap-2 rounded-md bg-cyan-300 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-200">
+                Start a design <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </a>
               <a href="#how" className="text-sm font-semibold text-slate-300 underline-offset-4 hover:text-white hover:underline">How it works</a>
             </div>
           </div>
@@ -124,7 +114,11 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
 
         <div className="mt-14">
           <PinFinFlow />
+          <p className="mt-3 font-mono text-[11px] text-slate-500">Concept illustration only; it is not solver output or CFD.</p>
         </div>
+        <p className="mt-4 font-mono text-xs font-semibold text-orange-200">
+          Reduced-order model (2-D conjugate conduction + duct-flow ΔP), not CFD
+        </p>
 
         <dl className="mt-6 grid grid-cols-2 gap-y-4 border-y border-slate-800 py-5 font-mono text-xs md:grid-cols-4">
           {limits.map(([k, v]) => (
@@ -214,7 +208,7 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
                 </li>
               ))}
             </ol>
-            <p className="mt-5 leading-relaxed text-slate-400">CAD generation, meshing, CFD setup, the design sweep and post-processing run without you. You come back to three designs that already meet your limits.</p>
+            <p className="mt-5 leading-relaxed text-slate-400">The engine evaluates a discrete candidate set with its reduced-order thermal and hydraulic model, then identifies the feasible Pareto front. It does not mesh or solve CFD.</p>
             <div className="mt-6 grid grid-cols-2 gap-4 border-t border-cyan-300/40 pt-5">
               <div>
                 <div className="font-mono text-[11px] uppercase tracking-[0.15em] text-slate-500">Your input</div>
@@ -228,7 +222,7 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
             </div>
           </motion.div>
         </div>
-        <p className="mt-10 font-mono text-[11px] text-slate-500">Times and click counts are typical estimates for one manual cold-plate iteration, not measurements; they vary by team, tools and mesh size.</p>
+        <p className="mt-10 font-mono text-[11px] text-slate-500">Manual workflow comparisons are illustrative; they are not measured product performance.</p>
       </section>
 
       <section id="how" className="mx-auto max-w-6xl px-6 py-24">
@@ -277,13 +271,11 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
             Built for engineers who want to save the world.
           </h2>
           <p className="mt-8 max-w-2xl text-lg leading-relaxed text-slate-300">
-            Every watt not spent pumping coolant goes back to the grid. ColdShock AI gives every thermal engineer a CFD team on demand, so better cooling ships faster and data centers lean less on the grid.
+            Every watt not spent pumping coolant goes back to the grid. ColdShock AI helps thermal engineers explore cold-plate trade-offs using a disclosed reduced-order model, not a CFD solver.
           </p>
-          {demoHref && (
-            <Link to={demoHref} className="mt-10 inline-flex items-center gap-2 rounded-md bg-slate-100 px-5 py-3 font-semibold text-slate-950 transition hover:bg-white">
-              See it in action <ArrowRight className="h-4 w-4" />
-            </Link>
-          )}
+          <a href={chatUrl} className="mt-10 inline-flex items-center gap-2 rounded-md bg-slate-100 px-5 py-3 font-semibold text-slate-950 transition hover:bg-white">
+            Start a design <ArrowRight className="h-4 w-4" />
+          </a>
         </motion.div>
       </section>
 
@@ -294,25 +286,9 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
             <h2 className="mt-3 font-display text-3xl font-semibold md:text-4xl">Tell the assistant what you're cooling.</h2>
           </div>
           <div className="flex flex-col items-start gap-3 md:items-end">
-            {chatHref ? (
-              <a
-                href={chatHref}
-                className="inline-flex items-center gap-2.5 rounded-md bg-cyan-300 px-6 py-3.5 text-lg font-semibold text-slate-950 transition hover:bg-cyan-200"
-              >
-                <MessageSquare className="h-5 w-5" /> Launch chatbot
-              </a>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setChatNotice(true)}
-                className="inline-flex items-center gap-2.5 rounded-md bg-cyan-300 px-6 py-3.5 text-lg font-semibold text-slate-950 transition hover:bg-cyan-200"
-              >
-                <MessageSquare className="h-5 w-5" /> Launch chatbot
-              </button>
-            )}
-            <p role="status" aria-live="polite" className="h-4 font-mono text-xs text-slate-400">
-              {chatNotice ? "Chatbot coming soon." : ""}
-            </p>
+            <a href={chatUrl} className="inline-flex items-center gap-2.5 rounded-md bg-cyan-300 px-6 py-3.5 text-lg font-semibold text-slate-950 transition hover:bg-cyan-200">
+              <MessageSquare className="h-5 w-5" /> Launch chatbot
+            </a>
           </div>
         </div>
       </section>
@@ -320,7 +296,7 @@ export default function Landing({ demoHref = "/demo", chatHref = null }: { demoH
       <footer className="border-t border-slate-800">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 px-6 py-8 font-mono text-[11px] text-slate-500">
           <span>ColdShock AI · Built at Georgia Tech with Devin</span>
-          <span>Hero flow is an illustrative model; chart uses placeholder sample data.</span>
+          <span>Reference-package engine run · reduced-order model, not CFD.</span>
         </div>
       </footer>
     </div>
